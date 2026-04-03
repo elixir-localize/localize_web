@@ -1,28 +1,52 @@
 defmodule LocalizeWeb.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+
   def project do
     [
       app: :localize_web,
-      version: "0.1.0",
-      elixir: "~> 1.19",
+      version: @version,
+      elixir: "~> 1.17",
+      name: "Localize Web",
+      description: description(),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      elixirc_paths: elixirc_paths(Mix.env()),
+      deps: deps(),
+      dialyzer: [
+        plt_add_apps: ~w(gettext phoenix phoenix_live_view phoenix_html)a
+      ]
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
+  defp description do
+    """
+    Plugs, localized routes, and HTML helpers for the Localize library.
+    """
+  end
+
   def application do
     [
       extra_applications: [:logger]
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
+      {:localize, path: "../localize"},
+      {:plug, "~> 1.9"},
+      {:gettext, "~> 1.0"},
+      {:phoenix, "~> 1.7", optional: true},
+      {:phoenix_html, "~> 4.0"},
+      {:phoenix_html_helpers, "~> 1.0", optional: true},
+      {:phoenix_live_view, "~> 1.0", optional: true},
+      {:jason, "~> 1.0", optional: true},
+      {:ex_doc, "~> 0.34", only: [:dev, :release], runtime: false},
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false}
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib"]
+  defp elixirc_paths(_), do: ["lib"]
 end
