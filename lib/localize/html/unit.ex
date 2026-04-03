@@ -178,7 +178,13 @@ defmodule Localize.HTML.Unit do
   end
 
   defp to_selection_tuple(unit, options) do
-    display_name = Localize.Unit.display_name(to_string(unit), options)
+    display_name =
+      case Localize.Unit.display_name(to_string(unit), options) do
+        {:ok, name} -> name
+        name when is_binary(name) -> name
+        _ -> to_string(unit)
+      end
+
     unit_code = to_string(unit)
     {display_name, unit_code}
   end

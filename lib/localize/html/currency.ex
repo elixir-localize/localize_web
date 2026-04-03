@@ -122,7 +122,7 @@ defmodule Localize.HTML.Currency do
       currencies: Localize.Currency.known_currency_codes(),
       locale: Localize.get_locale(),
       collator: &default_collator/1,
-      mapper: &{&1.code <> " - " <> &1.name, &1.code},
+      mapper: &{to_string(&1.code) <> " - " <> to_string(&1.name), to_string(&1.code)},
       selected: nil
     )
   end
