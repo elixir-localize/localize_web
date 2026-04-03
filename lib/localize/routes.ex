@@ -83,6 +83,9 @@ defmodule Localize.Routes do
     gettext_backend = Keyword.fetch!(options, :gettext)
     helpers? = Keyword.get(options, :helpers, true)
 
+    # Expand module aliases to atoms at compile time
+    gettext_backend = Macro.expand(gettext_backend, __CALLER__)
+
     caller = __CALLER__.module
 
     Module.put_attribute(caller, :_helpers?, helpers?)
@@ -240,6 +243,13 @@ defmodule Localize.Routes do
     |> Enum.uniq_by(&canonical_route/1)
   end
 
+  # Single locale (string or atom) - wrap in list
+  defmacro localize(locale, do: block) when is_binary(locale) or is_atom(locale) do
+    quote location: :keep do
+      localize([unquote(locale)], do: unquote(block))
+    end
+  end
+
   defmacro localize(locale, do: {:__block__, meta, routes}) do
     translated_routes =
       for route <- routes do
@@ -274,7 +284,8 @@ defmodule Localize.Routes do
   # Do the actual translations - locale is {%LanguageTag{}, gettext_locale_string}
   defmacro localize({locale, gettext_locale}, {verb, meta, [path | args]})
            when verb in @localizable_verbs do
-    do_localize(:private, {locale, gettext_locale}, {verb, meta, [path | args]})
+    gettext_backend = Module.get_attribute(__CALLER__.module, :_gettext_backend)
+    do_localize(:private, {locale, gettext_locale}, gettext_backend, {verb, meta, [path | args]})
   end
 
   # If the verb is unsupported for localization
@@ -289,7 +300,7 @@ defmodule Localize.Routes do
           """
   end
 
-  defp do_localize(field, {locale, gettext_locale}, {verb, meta, [path | args]}) do
+  defp do_localize(field, {locale, gettext_locale}, gettext_backend, {verb, meta, [path | args]}) do
     locale = eval_locale(locale)
 
     {original_path, _} = escape_interpolation(path) |> Code.eval_quoted()
@@ -299,7 +310,7 @@ defmodule Localize.Routes do
       |> interpolate(locale)
       |> combine_string_segments()
       |> :erlang.iolist_to_binary()
-      |> translate_path(gettext_locale)
+      |> translate_path(gettext_locale, gettext_backend)
 
     args =
       add_to_route(args, field, :localize_locale, locale)
@@ -366,7 +377,7 @@ defmodule Localize.Routes do
 
     path
     |> interpolate(locale)
-    |> translate_path_now(gettext_locale)
+    |> translate_path_now(locale, gettext_locale, gettext_backend)
   end
 
   # Interpolates the locale, language and territory
@@ -387,55 +398,61 @@ defmodule Localize.Routes do
     end)
   end
 
-  def translate_path_now(path, gettext_locale) do
+  def translate_path_now(path, locale, gettext_locale, gettext_backend) do
     Macro.prewalk(path, fn segment ->
-      translate_segment_now(gettext_locale, segment)
+      translate_segment_now(locale, gettext_locale, gettext_backend, segment)
     end)
   end
 
-  defp translate_segment_now(_locale, "" = segment), do: segment
+  defp translate_segment_now(_locale, _gettext_locale, _backend, "" = segment), do: segment
 
-  defp translate_segment_now(_locale, @interpolate <> _rest = segment),
+  defp translate_segment_now(_locale, _gettext_locale, _backend, @interpolate <> _rest = segment),
     do: segment
 
-  defp translate_segment_now(_locale, segment) when not is_binary(segment),
-    do: segment
+  defp translate_segment_now(_locale, _gettext_locale, _backend, segment)
+       when not is_binary(segment),
+       do: segment
 
-  defp translate_segment_now(gettext_locale, segment) when is_binary(segment) do
+  defp translate_segment_now(locale, gettext_locale, gettext_backend, segment)
+       when is_binary(segment) do
     segment
     |> String.split("/")
-    |> translate_segment_parts(gettext_locale)
+    |> translate_segment_parts(locale, gettext_locale, gettext_backend)
     |> Enum.join("/")
   end
 
-  defp translate_segment_parts([last_part], gettext_locale) do
+  defp translate_segment_parts([last_part], locale, gettext_locale, gettext_backend) do
     [last_part | rest] = Regex.split(~r/[#\?]/, last_part, include_captures: true)
 
-    [translate_segment_part(last_part, gettext_locale) | rest]
+    [translate_segment_part(last_part, locale, gettext_locale, gettext_backend) | rest]
     |> :erlang.iolist_to_binary()
     |> List.wrap()
   end
 
-  defp translate_segment_parts([part | rest], gettext_locale) do
+  defp translate_segment_parts([part | rest], locale, gettext_locale, gettext_backend) do
     [
-      translate_segment_part(part, gettext_locale)
-      | translate_segment_parts(rest, gettext_locale)
+      translate_segment_part(part, locale, gettext_locale, gettext_backend)
+      | translate_segment_parts(rest, locale, gettext_locale, gettext_backend)
     ]
   end
 
-  defp translate_segment_part("", _locale), do: ""
+  defp translate_segment_part("", _locale, _gettext_locale, _backend), do: ""
 
-  defp translate_segment_part(":locale", locale) do
-    String.downcase(locale)
+  defp translate_segment_part(":locale", locale, _gettext_locale, _backend) do
+    to_string(locale.cldr_locale_id) |> String.downcase()
   end
 
-  defp translate_segment_part(":territory", _locale), do: ":territory"
+  defp translate_segment_part(":territory", locale, _gettext_locale, _backend) do
+    to_string(locale.territory) |> String.downcase()
+  end
 
-  defp translate_segment_part(":language", _locale), do: ":language"
+  defp translate_segment_part(":language", locale, _gettext_locale, _backend) do
+    to_string(locale.language) |> String.downcase()
+  end
 
-  defp translate_segment_part(part, gettext_locale) do
-    Gettext.put_locale(gettext_locale)
-    part
+  defp translate_segment_part(part, _locale, gettext_locale, gettext_backend) do
+    Gettext.put_locale(gettext_backend, gettext_locale)
+    Gettext.dgettext(gettext_backend, @domain, part)
   end
 
   # Since we are doing compile-time translation of the
@@ -477,28 +494,28 @@ defmodule Localize.Routes do
   end
 
   @doc false
-  def translate_path(path, gettext_locale) do
+  def translate_path(path, gettext_locale, gettext_backend) do
     path
     |> String.split(@path_separator)
-    |> Enum.map(&translate_part(gettext_locale, &1))
+    |> Enum.map(&translate_part(gettext_locale, gettext_backend, &1))
     |> reduce_parts()
   end
 
-  defp translate_part(_locale, "" = part), do: part
-  defp translate_part(_locale, @interpolate <> _rest = part), do: part
+  defp translate_part(_locale, _backend, "" = part), do: part
+  defp translate_part(_locale, _backend, @interpolate <> _rest = part), do: part
 
-  defp translate_part(gettext_locale, part) do
+  defp translate_part(gettext_locale, gettext_backend, part) do
     domain = @domain
 
     quote do
-      Gettext.put_locale(unquote(gettext_locale))
-      Gettext.dgettext(Localize.Routes.__gettext_backend__(), unquote(domain), unquote(part))
-    end
-  end
+      Gettext.put_locale(unquote(gettext_backend), unquote(gettext_locale))
 
-  @doc false
-  def __gettext_backend__ do
-    raise "This function should be overridden at compile time"
+      Gettext.Macros.dgettext_with_backend(
+        unquote(gettext_backend),
+        unquote(domain),
+        unquote(part)
+      )
+    end
   end
 
   defp reduce_parts([]), do: []

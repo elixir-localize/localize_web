@@ -114,10 +114,7 @@ defmodule Localize.AcceptLanguage do
         {:ok, locale}
 
       nil ->
-        {:error,
-         Localize.UnknownLocaleError.exception(
-           locale_id: header
-         )}
+        {:error, Localize.UnknownLocaleError.exception(locale_id: header)}
     end
   end
 

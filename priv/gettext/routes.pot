@@ -1,0 +1,35 @@
+msgid "pages"
+msgstr ""
+
+msgid "users"
+msgstr ""
+
+msgid "faces"
+msgstr ""
+
+msgid "eyes"
+msgstr ""
+
+msgid "edit"
+msgstr ""
+
+msgid "objects"
+msgstr ""
+
+msgid "chapters"
+msgstr ""
+
+msgid "comments"
+msgstr ""
+
+msgid "columns"
+msgstr ""
+
+msgid "kapitel"
+msgstr ""
+
+msgid "seite"
+msgstr ""
+
+msgid "login"
+msgstr ""

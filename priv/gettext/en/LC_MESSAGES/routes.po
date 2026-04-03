@@ -1,0 +1,39 @@
+msgid ""
+msgstr ""
+"Language: en\n"
+
+msgid "pages"
+msgstr "pages"
+
+msgid "users"
+msgstr "users"
+
+msgid "faces"
+msgstr "face"
+
+msgid "eyes"
+msgstr "eyes"
+
+msgid "edit"
+msgstr "edit"
+
+msgid "objects"
+msgstr "objects"
+
+msgid "chapters"
+msgstr "chapters"
+
+msgid "comments"
+msgstr "comments"
+
+msgid "columns"
+msgstr "columns"
+
+msgid "kapitel"
+msgstr ""
+
+msgid "seite"
+msgstr ""
+
+msgid "login"
+msgstr ""
