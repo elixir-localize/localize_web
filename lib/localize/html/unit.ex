@@ -183,8 +183,7 @@ defmodule Localize.HTML.Unit do
     display_name =
       case Localize.Unit.display_name(to_string(unit), options) do
         {:ok, name} -> name
-        name when is_binary(name) -> name
-        _ -> to_string(unit)
+        {:error, _} -> to_string(unit)
       end
 
     unit_code = to_string(unit)

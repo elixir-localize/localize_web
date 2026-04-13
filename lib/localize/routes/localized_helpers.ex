@@ -384,6 +384,7 @@ defmodule Localize.Routes.LocalizedHelpers do
     |> Enum.sort()
   end
 
+  @doc false
   def helper_by_locale(routes) do
     routes
     |> Enum.group_by(fn {route, _exprs} ->

@@ -79,14 +79,6 @@ defmodule Localize.Plug.AcceptLanguage do
         )
 
         nil
-
-      {:error, {exception, reason}} ->
-        Logger.warning(
-          "Localize.Plug.AcceptLanguage: error parsing accept-language header " <>
-            "#{inspect(accept_language)}. #{inspect(exception)}: #{reason}"
-        )
-
-        nil
     end
   end
 

@@ -92,7 +92,7 @@ defmodule Localize.AcceptLanguage do
 
   """
   @spec best_match(String.t()) ::
-          {:ok, Localize.LanguageTag.t()} | {:error, Localize.UnknownLocaleError.t()}
+          {:ok, Localize.LanguageTag.t()} | {:error, Exception.t()}
   def best_match(header) when is_binary(header) do
     result =
       header

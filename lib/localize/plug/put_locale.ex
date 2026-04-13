@@ -362,7 +362,6 @@ defmodule Localize.Plug.PutLocale do
   defp validate_default(options, default) do
     case Localize.validate_locale(default) do
       {:ok, locale} -> Keyword.put(options, :default, locale)
-      {:error, {exception, reason}} -> raise exception, reason
       {:error, %{__exception__: true} = exception} -> raise exception
     end
   end

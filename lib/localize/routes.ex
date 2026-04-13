@@ -218,7 +218,6 @@ defmodule Localize.Routes do
         end
       else
         {:error, %{__exception__: true} = exception} -> raise exception
-        {:error, {exception, reason}} -> raise exception, reason
       end
     end
     |> Enum.reject(&is_nil/1)
@@ -362,8 +361,7 @@ defmodule Localize.Routes do
     |> translate_path_now(locale, gettext_locale, gettext_backend)
   end
 
-  # Interpolates the locale, language and territory
-  # into the path by splicing the AST
+  @doc false
   def interpolate(path, locale) do
     Macro.prewalk(path, fn
       {{:., _, [Kernel, :to_string]}, _, [{:locale, _, _}]} ->
@@ -380,6 +378,7 @@ defmodule Localize.Routes do
     end)
   end
 
+  @doc false
   def translate_path_now(path, locale, gettext_locale, gettext_backend) do
     Macro.prewalk(path, fn segment ->
       translate_segment_now(locale, gettext_locale, gettext_backend, segment)
