@@ -1,6 +1,8 @@
 defmodule Localize.HTML.Locale do
   @moduledoc """
-  Implements an HTML Form select for localised locale display.
+  Generates HTML `<select>` tags and option lists for localized locale display.
+
+  Locales are displayed with their localized display name. A special `:identity` mode renders each locale's name in its own language. The list of locales, sort order, and display format are all configurable.
 
   """
 
@@ -26,40 +28,35 @@ defmodule Localize.HTML.Locale do
   @dont_include_default [:"en-001", :root, :und]
 
   @doc """
-  Generate an HTML select tag for a locale list
-  that can be used with a `Phoenix.HTML.Form.t`.
+  Generates an HTML select tag for a locale list that can be used with a `Phoenix.HTML.Form.t`.
 
   ### Arguments
 
-  * A `t:Phoenix.HTML.Form.t/0` form.
+  * `form` is a `t:Phoenix.HTML.Form.t/0` form.
 
-  * A `t:Phoenix.HTML.Form.field/0` field.
+  * `field` is a `t:Phoenix.HTML.Form.field/0` field.
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
-  * `:locales` defines the list of locales to be displayed
-    in the select tag. The default is `Localize.all_locale_ids/0`
-    with meta locales excluded.
+  * `:locales` defines the list of locales to be displayed in the select tag. The default is `Localize.all_locale_ids/0` with meta locales excluded.
 
-  * `:locale` defines the locale used to localise the display
-    names. The default is the locale returned by
-    `Localize.get_locale/0`. If set to `:identity` then each
-    locale in `:locales` will be rendered in its own locale.
+  * `:locale` defines the locale used to localise the display names. The default is the locale returned by `Localize.get_locale/0`. If set to `:identity` then each locale in `:locales` will be rendered in its own locale.
 
-  * `:collator` is a function used to sort the locales. The
-    default collator sorts by display_name.
+  * `:collator` is a function used to sort the locales. The default collator sorts by display name.
 
-  * `:mapper` is a function that creates the text to be displayed
-    in the select tag for each locale. It receives a map with
-    `:display_name`, `:locale` and `:language_tag` keys. The
-    default mapper is `&{&1.display_name, &1.locale}`.
+  * `:mapper` is a function that creates the text to be displayed in the select tag for each locale. It receives a map with `:display_name`, `:locale` and `:language_tag` keys. The default mapper is `&{&1.display_name, &1.locale}`.
 
-  * `:selected` identifies the locale to be selected by default
-    in the select tag. The default is `nil`.
+  * `:selected` identifies the locale to be selected by default in the select tag. The default is `nil`.
 
   * `:prompt` is a prompt displayed at the top of the select box.
+
+  ### Returns
+
+  * A `t:Phoenix.HTML.safe/0` select tag, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   ### Examples
 
@@ -80,17 +77,21 @@ defmodule Localize.HTML.Locale do
   end
 
   @doc """
-  Generate a list of options for a locale list that can be used
-  with `Phoenix.HTML.Form.options_for_select/2` or to create a
-  `<datalist>`.
+  Generates a list of options for a locale list that can be used with `Phoenix.HTML.Form.options_for_select/2` or to create a `<datalist>`.
 
   ### Arguments
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
   See `Localize.HTML.Locale.select/3` for options.
+
+  ### Returns
+
+  * A list of `{display_name, locale_string}` tuples, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   """
   @spec locale_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
@@ -252,7 +253,7 @@ defmodule Localize.HTML.Locale do
 
   defp display_name(locale, @identity, options) do
     options = Keyword.put(options, :locale, locale)
-    display_name = Localize.LocaleDisplay.display_name!(locale, options)
+    display_name = Localize.Locale.LocaleDisplay.display_name!(locale, options)
 
     locale_string =
       if locale.canonical_locale_id,
@@ -263,7 +264,7 @@ defmodule Localize.HTML.Locale do
   end
 
   defp display_name(locale, _in_locale, options) do
-    display_name = Localize.LocaleDisplay.display_name!(locale, options)
+    display_name = Localize.Locale.LocaleDisplay.display_name!(locale, options)
 
     locale_string =
       if locale.canonical_locale_id,

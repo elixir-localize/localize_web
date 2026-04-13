@@ -1,22 +1,14 @@
 defmodule Localize.Routes do
   @moduledoc """
-  Generate localized routes and route helper modules.
+  Compile-time route localization for Phoenix routers.
 
-  This module when `use`d provides a `localize/1` macro that is
-  designed to wrap the standard Phoenix route macros such as
-  `get/3`, `put/3` and `resources/3` and localizes them for each
-  locale defined in a Gettext backend module.
+  When `use`d, this module provides a `localize/1` macro that wraps standard Phoenix route macros such as `get/3`, `put/3` and `resources/3`, generating localized versions for each locale defined in a Gettext backend module.
 
-  Translations for the parts of a given route path are translated
-  at compile-time and are then combined into a localised route
-  that is added to the standard Phoenix routing framework.
+  Path segments are translated at compile time using Gettext's `dgettext/3` with the `"routes"` domain. The translated paths are added to the standard Phoenix routing framework alongside the original routes.
 
   ### Configuration
 
-  A Gettext backend module is required. Path parts (the parts
-  between "/") are translated at compile time using `Gettext`.
-  Therefore localization can only be applied to locales that are
-  defined in a Gettext backend module.
+  A Gettext backend module is required. Path segments (the parts between `/`) are translated at compile time. Therefore localization can only be applied to locales that are defined in a Gettext backend module.
 
   For example:
 
@@ -32,33 +24,23 @@ defmodule Localize.Routes do
 
   ### Interpolating Locale Data
 
-  A route may be defined with elements of the locale interpolated
-  into it. These interpolations are specified using the normal
-  `\#{}` interpolation syntax. However since route translation
-  occurs at compile time only the following interpolations are
-  supported:
+  A route may be defined with elements of the locale interpolated into it. These interpolations are specified using the normal `\#{}` interpolation syntax. However since route translation occurs at compile time only the following interpolations are supported:
 
   * `locale` will interpolate the CLDR locale name.
-  * `language` will interpolate the language name.
+
+  * `language` will interpolate the language code.
+
   * `territory` will interpolate the territory code.
 
   ### Localized Helpers
 
-  A `LocalizedHelpers` module is generated at compile-time.
-  Assuming the router module is called `MyApp.Router` then the
-  full name of the localized helper module is
-  `MyApp.Router.LocalizedHelpers`.
+  A `LocalizedHelpers` module is generated at compile time. Assuming the router module is called `MyApp.Router` then the full name of the localized helper module is `MyApp.Router.LocalizedHelpers`.
 
-  Localized helpers can be disabled by adding `helpers: false`
-  to the `use Localize.Routes` line in your router module.
+  Localized helpers can be disabled by adding `helpers: false` to the `use Localize.Routes` line in your router module.
 
   ### Translations
 
-  In order for routes to be localized, translations must be
-  provided for each path segment. This translation is performed
-  by `Gettext.dgettext/3` with the domain "routes". Therefore
-  for each configured locale, a "routes.pot" file is required
-  containing the path segment translations for that locale.
+  In order for routes to be localized, translations must be provided for each path segment. This translation is performed by `Gettext.dgettext/3` with the domain `"routes"`. Therefore for each configured locale, a `routes.po` file is required containing the path segment translations for that locale.
 
   """
 

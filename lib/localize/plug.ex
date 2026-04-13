@@ -1,38 +1,29 @@
 defmodule Localize.Plug do
   @moduledoc """
-  Functions to support setting the locale for Localize and/or Gettext from the session.
+  Utility functions for setting the locale from the session for Localize and Gettext.
+
+  The primary use case is in LiveView `on_mount` callbacks where the locale needs to be restored from the session that was set during the initial HTTP request by `Localize.Plug.PutLocale` and `Localize.Plug.PutSession`.
 
   """
-
-  @type application :: :localize | :gettext
-  @type applications :: [application]
 
   @session_key Localize.Plug.PutLocale.session_key()
 
   @doc """
-  Puts the locale from the session into the current process for
-  `Localize` and/or `Gettext`.
+  Puts the locale from the session into the current process.
 
-  This function is useful to place in the `on_mount` callback
-  for a LiveView.
+  Always sets the Localize process locale via `Localize.put_locale/1`. If Gettext backends are provided, the locale is also set on each backend.
+
+  This function is useful to place in the `on_mount` callback for a LiveView.
 
   ### Arguments
 
-  * `session` is any map, typically the map returned as part of
-    the `conn` of a Phoenix or Plug request. A `session` is
-    passed as the third parameter to the `on_mount` callback
-    of a LiveView request.
+  * `session` is any map, typically the map returned as part of the `conn` of a Phoenix or Plug request. A `session` is passed as the third parameter to the `on_mount` callback of a LiveView request.
 
   * `options` is a keyword list of options.
 
   ### Options
 
-  * `:apps` is a list of applications for which the locale may
-    be set. The valid options are `:localize` and `:gettext`.
-    The default is `[:localize, :gettext]`.
-
-  * `:gettext` is the Gettext backend module. Required if
-    `:gettext` is in the `:apps` list.
+  * `:gettext` is a Gettext backend module or a list of Gettext backend modules on which the locale will be set. The default is `[]` (no Gettext backends).
 
   ### Returns
 
@@ -43,8 +34,8 @@ defmodule Localize.Plug do
   ### Examples
 
       iex> Localize.Plug.put_locale_from_session(session)
-      iex> Localize.Plug.put_locale_from_session(session, apps: [:localize])
-      iex> Localize.Plug.put_locale_from_session(session, apps: [:localize, :gettext], gettext: MyApp.Gettext)
+      iex> Localize.Plug.put_locale_from_session(session, gettext: MyApp.Gettext)
+      iex> Localize.Plug.put_locale_from_session(session, gettext: [MyApp.Gettext, MyOtherApp.Gettext])
 
       # In a LiveView
       def on_mount(:default, _params, session, socket) do
@@ -59,40 +50,36 @@ defmodule Localize.Plug do
   def put_locale_from_session(session, options \\ [])
 
   def put_locale_from_session(%{@session_key => locale}, options) do
-    apps = Keyword.get(options, :apps, [:localize, :gettext])
-    gettext_backend = Keyword.get(options, :gettext)
+    gettext_backends = normalize_gettext_backends(Keyword.get(options, :gettext, []))
 
     with {:ok, locale} <- Localize.validate_locale(locale) do
-      Enum.reduce_while(apps, nil, fn
-        :localize, _acc ->
-          {:cont, Localize.put_locale(locale)}
+      Localize.put_locale(locale)
 
-        :gettext, _acc ->
-          if gettext_backend do
-            case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
-              {:ok, gettext_locale} ->
-                Gettext.put_locale(gettext_backend, gettext_locale)
-                {:cont, {:ok, locale}}
+      Enum.each(gettext_backends, fn gettext_backend ->
+        case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
+          {:ok, gettext_locale} ->
+            Gettext.put_locale(gettext_backend, gettext_locale)
 
-              {:error, _reason} ->
-                {:halt,
-                 {:error,
-                  {Localize.UnknownLocaleError,
-                   "No gettext locale defined for #{inspect(locale)}"}}}
-            end
-          else
-            {:cont, {:ok, locale}}
-          end
+          {:error, _reason} ->
+            require Logger
 
-        other, _acc ->
-          raise ArgumentError,
-                "Invalid application passed to Localize.Plug.put_locale_from_session/2. " <>
-                  "Valid applications are :localize and :gettext. Found #{inspect(other)}"
+            Logger.warning(
+              "Localize.Plug.put_locale_from_session/2: locale #{inspect(locale.cldr_locale_id)} " <>
+                "does not have a matching Gettext locale for backend #{inspect(gettext_backend)}. " <>
+                "No Gettext locale has been set."
+            )
+        end
       end)
+
+      {:ok, locale}
     end
   end
 
   def put_locale_from_session(_session, _options) do
     {:error, {Localize.UnknownLocaleError, "No locale was found in the session"}}
   end
+
+  defp normalize_gettext_backends(nil), do: []
+  defp normalize_gettext_backends(backend) when is_atom(backend), do: [backend]
+  defp normalize_gettext_backends(backends) when is_list(backends), do: backends
 end

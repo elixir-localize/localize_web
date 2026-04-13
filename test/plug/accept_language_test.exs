@@ -64,6 +64,7 @@ defmodule Localize.Plug.AcceptLanguageTest do
       assert conn.private[:localize_locale] == nil
     end
 
+    @tag :capture_log
     test "sets nil for unrecognized accept-language content" do
       options = AcceptLanguage.init([])
 
@@ -87,6 +88,7 @@ defmodule Localize.Plug.AcceptLanguageTest do
           |> AcceptLanguage.call(options)
         end)
 
+      assert log =~ "Localize.Plug.AcceptLanguage"
       assert log =~ "!!!"
     end
 

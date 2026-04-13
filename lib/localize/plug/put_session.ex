@@ -1,30 +1,20 @@
 defmodule Localize.Plug.PutSession do
   @moduledoc """
-  Puts the locale in the session.
+  Plug that persists the locale discovered by `Localize.Plug.PutLocale` into the session.
 
-  The session key is fixed to be `#{Localize.Plug.PutLocale.session_key()}`
-  in order that downstream functions like those in LiveView don't
-  have to be passed options.
+  The session key is fixed to `"#{Localize.Plug.PutLocale.session_key()}"` so that downstream functions like LiveView `on_mount` callbacks can retrieve the locale without needing additional configuration.
 
-  ## Options
+  ### Options
 
-  * `:as` determines the format in which the locale is saved in
-    the session. The valid settings are:
+  * `:as` determines the format in which the locale is saved in the session. The valid settings are:
 
-    * `:string` in which the current locale is converted to a
-      string before storing in the session. It will then be parsed
-      back into a `%Localize.LanguageTag{}` upon reading it from
-      the session. This option minimises space used in the session
-      at the expense of CPU time to serialize and parse.
+    * `:string` in which the current locale is converted to a string before storing in the session. It will then be parsed back into a `%Localize.LanguageTag{}` upon reading it from the session. This option minimises space used in the session at the expense of CPU time to serialize and parse.
 
-    * `:language_tag` in which the current locale is stored in
-      the session in its native `%Localize.LanguageTag{}` format.
-      This minimizes CPU time at the expense of larger session
-      storage.
+    * `:language_tag` in which the current locale is stored in the session in its native `%Localize.LanguageTag{}` format. This minimizes CPU time at the expense of larger session storage.
 
   The default is `as: :string`.
 
-  ## Examples
+  ### Examples
 
       plug Localize.Plug.PutLocale,
         apps: [:localize, :gettext],

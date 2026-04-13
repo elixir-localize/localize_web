@@ -1,10 +1,8 @@
 defmodule Localize.Routes.LocalizedHelpers do
   @moduledoc """
-  Generates a module that implements localised helpers.
+  Generates a module that implements localized route helpers.
 
-  It introspects the generated helpers module and creates
-  a wrapper function that translates (at compile time) the
-  path segments.
+  At compile time, this module introspects the Phoenix-generated helpers module and creates wrapper functions that dispatch to the correct locale-specific helper based on the current locale. It also generates `*_links` functions that produce a map of locale-to-URL pairs suitable for `hreflang` link tags.
 
   """
 

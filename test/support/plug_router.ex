@@ -8,7 +8,6 @@ defmodule MyPlugRouter do
   plug(:match)
 
   plug(Localize.Plug.PutLocale,
-    apps: [:localize, :gettext],
     from: [:path, :query, :route],
     gettext: MyApp.Gettext
   )

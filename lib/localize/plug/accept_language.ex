@@ -1,17 +1,14 @@
 defmodule Localize.Plug.AcceptLanguage do
   @moduledoc """
-  Parses the accept-language header if one is available and sets
-  `conn.private[:localize_locale]` accordingly. The locale can
-  be later retrieved by `Localize.Plug.AcceptLanguage.get_locale/1`.
+  Standalone plug that parses the `Accept-Language` header and sets `conn.private[:localize_locale]` to the best matching locale.
 
-  ## Options
+  The locale can be later retrieved by `Localize.Plug.AcceptLanguage.get_locale/1`. This plug is useful when you only need accept-language parsing without the full locale discovery pipeline of `Localize.Plug.PutLocale`.
 
-  * `:no_match_log_level` determines the logging level for
-    the case when no matching locale is configured to meet the
-    user's request. The default is `:warning`. If set to `nil`
-    then no logging is performed.
+  ### Options
 
-  ## Examples
+  * `:no_match_log_level` determines the logging level for the case when no matching locale is configured to meet the user's request. The default is `:warning`. If set to `nil` then no logging is performed.
+
+  ### Examples
 
       plug Localize.Plug.AcceptLanguage
 
@@ -41,8 +38,17 @@ defmodule Localize.Plug.AcceptLanguage do
   end
 
   @doc """
-  Returns the locale which is the best match for the provided
-  accept-language header.
+  Returns the best matching locale for the provided accept-language header value.
+
+  ### Arguments
+
+  * `accept_language` is an accept-language header string or `nil`.
+
+  * `options` is the plug options map containing `:log_level`.
+
+  ### Returns
+
+  * A `t:Localize.LanguageTag.t/0` or `nil`.
 
   """
   def best_match(nil, _options) do
@@ -55,23 +61,45 @@ defmodule Localize.Plug.AcceptLanguage do
         locale
 
       {:error, %Localize.UnknownLocaleError{} = exception} ->
-        if options.log_level,
-          do: Logger.log(options.log_level, Exception.message(exception))
+        if options.log_level do
+          Logger.log(
+            options.log_level,
+            "Localize.Plug.AcceptLanguage: no matching locale found " <>
+              "for accept-language header #{inspect(accept_language)}. " <>
+              Exception.message(exception)
+          )
+        end
 
         nil
 
       {:error, %{__exception__: true} = exception} ->
-        Logger.warning(Exception.message(exception))
+        Logger.warning(
+          "Localize.Plug.AcceptLanguage: error parsing accept-language header " <>
+            "#{inspect(accept_language)}. #{Exception.message(exception)}"
+        )
+
         nil
 
       {:error, {exception, reason}} ->
-        Logger.warning("#{inspect(exception)}: #{reason}")
+        Logger.warning(
+          "Localize.Plug.AcceptLanguage: error parsing accept-language header " <>
+            "#{inspect(accept_language)}. #{inspect(exception)}: #{reason}"
+        )
+
         nil
     end
   end
 
   @doc """
-  Return the locale set by `Localize.Plug.AcceptLanguage`.
+  Returns the locale set by `Localize.Plug.AcceptLanguage`.
+
+  ### Arguments
+
+  * `conn` is a `t:Plug.Conn.t/0`.
+
+  ### Returns
+
+  * A `t:Localize.LanguageTag.t/0` or `nil`.
 
   """
   def get_locale(conn) do

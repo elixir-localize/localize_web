@@ -1,10 +1,8 @@
 defmodule Localize.AcceptLanguage do
   @moduledoc """
-  Parses an HTTP `Accept-Language` header and finds the best matching locale.
+  Parses HTTP `Accept-Language` headers and finds the best matching locale.
 
-  The `Accept-Language` header is parsed per RFC 2616 into quality-tagged
-  language tags which are then matched against available locales using
-  `Localize.validate_locale/1`.
+  The `Accept-Language` header is parsed per [RFC 2616](https://www.rfc-editor.org/rfc/rfc2616#section-14.4) into quality-tagged language tags which are then matched against available locales using `Localize.validate_locale/1`. The primary entry point is `best_match/1` which returns the highest-quality successfully validated locale.
 
   """
 

@@ -1,6 +1,8 @@
 defmodule Localize.HTML.Unit do
   @moduledoc """
-  Implements an HTML Form select for localised unit display.
+  Generates HTML `<select>` tags and option lists for localized unit-of-measure display.
+
+  Units are displayed with their localized display name. The list of units, display style (long, short, narrow), sort order, and display format are all configurable.
 
   """
 
@@ -13,42 +15,40 @@ defmodule Localize.HTML.Unit do
           | {:style, :long | :short | :narrow}
         ]
 
+  @omit_from_select_options [:units, :locale, :mapper, :collator, :style]
+
   @doc """
-  Generate an HTML select tag for a unit list
-  that can be used with a `t:Phoenix.HTML.Form.t/0`.
+  Generates an HTML select tag for a unit list that can be used with a `t:Phoenix.HTML.Form.t/0`.
 
   ### Arguments
 
-  * A `t:Phoenix.HTML.Form.t/0` form.
+  * `form` is a `t:Phoenix.HTML.Form.t/0` form.
 
-  * A `t:Phoenix.HTML.Form.field/0` field.
+  * `field` is a `t:Phoenix.HTML.Form.field/0` field.
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
   * `:units` is a list of units to be displayed in the select.
 
-  * `:style` is the style of unit name to be displayed. The
-    options are `:long`, `:short` and `:narrow`. The default
-    is `:long`.
+  * `:style` is the style of unit name to be displayed. The options are `:long`, `:short` and `:narrow`. The default is `:long`.
 
-  * `:locale` defines the locale to be used to localise the
-    description of the units. The default is the locale
-    returned by `Localize.get_locale/0`.
+  * `:locale` defines the locale to be used to localise the description of the units. The default is the locale returned by `Localize.get_locale/0`.
 
-  * `:collator` is a function used to sort the units. The
-    default collator sorts by display name.
+  * `:collator` is a function used to sort the units. The default collator sorts by display name.
 
-  * `:mapper` is a function that creates the text to be displayed
-    in the select tag for each unit. It receives a tuple
-    `{display_name, unit_code}`. The default is the identity
-    function.
+  * `:mapper` is a function that creates the text to be displayed in the select tag for each unit. It receives a tuple `{display_name, unit_code}`. The default is the identity function.
 
-  * `:selected` identifies the unit to be selected by default
-    in the select tag. The default is `nil`.
+  * `:selected` identifies the unit to be selected by default in the select tag. The default is `nil`.
 
   * `:prompt` is a prompt displayed at the top of the select box.
+
+  ### Returns
+
+  * A `t:Phoenix.HTML.safe/0` select tag, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   ### Examples
 
@@ -70,17 +70,21 @@ defmodule Localize.HTML.Unit do
   end
 
   @doc """
-  Generate a list of options for a unit list that can be used
-  with `Phoenix.HTML.Form.options_for_select/2` or to create a
-  `<datalist>`.
+  Generates a list of options for a unit list that can be used with `Phoenix.HTML.Form.options_for_select/2` or to create a `<datalist>`.
 
   ### Arguments
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
   See `Localize.HTML.Unit.select/3` for options.
+
+  ### Returns
+
+  * A list of `{display_name, unit_code}` tuples, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   """
   @spec unit_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
@@ -96,8 +100,6 @@ defmodule Localize.HTML.Unit do
   defp select(_form, _field, {:error, reason}, _selected) do
     {:error, reason}
   end
-
-  @omit_from_select_options [:units, :locale, :mapper, :collator, :style]
 
   defp select(form, field, options, _selected) do
     select_options =

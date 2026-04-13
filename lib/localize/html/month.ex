@@ -1,6 +1,8 @@
 defmodule Localize.HTML.Month do
   @moduledoc """
-  Implements an HTML Form select for localised month name display.
+  Generates HTML `<select>` tags and option lists for localized month name display.
+
+  Month names are sourced from CLDR calendar data and localized according to the current or specified locale. The display style (wide, abbreviated, narrow), calendar system, and sort order are all configurable.
 
   """
 
@@ -18,47 +20,39 @@ defmodule Localize.HTML.Month do
   @omit_from_select_options [:months, :locale, :mapper, :collator, :calendar, :year, :style]
 
   @doc """
-  Generate an HTML select tag for a month name list
-  that can be used with a `Phoenix.HTML.Form.t`.
+  Generates an HTML select tag for a month name list that can be used with a `Phoenix.HTML.Form.t`.
 
   ### Arguments
 
-  * A `t:Phoenix.HTML.Form.t/0` form.
+  * `form` is a `t:Phoenix.HTML.Form.t/0` form.
 
-  * A `t:Phoenix.HTML.Form.field/0` field.
+  * `field` is a `t:Phoenix.HTML.Form.field/0` field.
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
-  * `:months` defines the list of month numbers to be displayed.
-    The default is `1..12`.
+  * `:months` defines the list of month numbers to be displayed. The default is `1..12`.
 
-  * `:calendar` is the calendar from which the month names are
-    derived. The default is `Calendar.ISO`.
+  * `:calendar` is the calendar from which the month names are derived. The default is `Calendar.ISO`.
 
-  * `:year` is the year from which the number of months is
-    derived. The default is the current year.
+  * `:year` is the year from which the number of months is derived. The default is the current year.
 
-  * `:locale` defines the locale used to localise the month
-    names. The default is the locale returned by
-    `Localize.get_locale/0`.
+  * `:locale` defines the locale used to localise the month names. The default is the locale returned by `Localize.get_locale/0`.
 
-  * `:style` is the format of the month name. The options are
-    `:wide` (the default), `:abbreviated` and `:narrow`.
+  * `:style` is the format of the month name. The options are `:wide` (the default), `:abbreviated` and `:narrow`.
 
-  * `:collator` is a function used to sort the months.
-    The default collator preserves month order.
+  * `:collator` is a function used to sort the months. The default collator preserves month order.
 
-  * `:mapper` is a function that creates the text to be displayed
-    in the select tag for each month. It receives a tuple
-    `{month_name, month_number}`. The default is the identity
-    function.
+  * `:mapper` is a function that creates the text to be displayed in the select tag for each month. It receives a tuple `{month_name, month_number}`. The default is the identity function.
 
-  * `:selected` identifies the month to be selected by default
-    in the select tag. The default is `nil`.
+  * `:selected` identifies the month to be selected by default in the select tag. The default is `nil`.
 
   * `:prompt` is a prompt displayed at the top of the select box.
+
+  ### Returns
+
+  * A `t:Phoenix.HTML.safe/0` select tag.
 
   ### Examples
 
@@ -86,17 +80,19 @@ defmodule Localize.HTML.Month do
   end
 
   @doc """
-  Generate a list of options for a month list that can be used
-  with `Phoenix.HTML.Form.options_for_select/2` or to create a
-  `<datalist>`.
+  Generates a list of options for a month list that can be used with `Phoenix.HTML.Form.options_for_select/2` or to create a `<datalist>`.
 
   ### Arguments
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
   See `Localize.HTML.Month.select/3` for options.
+
+  ### Returns
+
+  * A list of `{month_name, month_number}` tuples.
 
   """
   @spec month_options(select_options) :: list(tuple())

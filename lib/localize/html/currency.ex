@@ -1,6 +1,8 @@
 defmodule Localize.HTML.Currency do
   @moduledoc """
-  Implements an HTML Form select for localised currency display.
+  Generates HTML `<select>` tags and option lists for localized currency display.
+
+  Currencies are displayed with their currency code and localized name. The list of currencies, sort order, and display format are all configurable.
 
   """
 
@@ -12,39 +14,38 @@ defmodule Localize.HTML.Currency do
           | {:selected, atom() | binary()}
         ]
 
+  @omit_from_select_options [:currencies, :locale, :mapper, :collator]
+
   @doc """
-  Generate an HTML select tag for a currency list
-  that can be used with a `Phoenix.HTML.Form.t`.
+  Generates an HTML select tag for a currency list that can be used with a `Phoenix.HTML.Form.t`.
 
   ### Arguments
 
-  * A `t:Phoenix.HTML.Form.t/0` form.
+  * `form` is a `t:Phoenix.HTML.Form.t/0` form.
 
-  * A `t:Phoenix.HTML.Form.field/0` field.
+  * `field` is a `t:Phoenix.HTML.Form.field/0` field.
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
-  * `:currencies` defines the list of currencies to be displayed
-    in the select tag. The default is
-    `Localize.Currency.known_currency_codes/0`.
+  * `:currencies` defines the list of currencies to be displayed in the select tag. The default is `Localize.Currency.known_currency_codes/0`.
 
-  * `:locale` defines the locale to be used to localise the
-    description of the currencies. The default is the locale
-    returned by `Localize.get_locale/0`.
+  * `:locale` defines the locale to be used to localise the description of the currencies. The default is the locale returned by `Localize.get_locale/0`.
 
-  * `:collator` is a function used to sort the currencies
-    in the selection list. The default collator sorts by name.
+  * `:collator` is a function used to sort the currencies in the selection list. The default collator sorts by name.
 
-  * `:mapper` is a function that creates the text to be displayed
-    in the select tag for each currency. The default function is
-    `&({&1.code <> " - " <> &1.name, &1.code})`.
+  * `:mapper` is a function that creates the text to be displayed in the select tag for each currency. The default function is `&({&1.code <> " - " <> &1.name, &1.code})`.
 
-  * `:selected` identifies the currency that is to be selected
-    by default in the select tag. The default is `nil`.
+  * `:selected` identifies the currency that is to be selected by default in the select tag. The default is `nil`.
 
   * `:prompt` is a prompt displayed at the top of the select box.
+
+  ### Returns
+
+  * A `t:Phoenix.HTML.safe/0` select tag, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   ### Examples
 
@@ -66,17 +67,21 @@ defmodule Localize.HTML.Currency do
   end
 
   @doc """
-  Generate a list of options for a currency list that can be used
-  with `Phoenix.HTML.Form.options_for_select/2` or to create a
-  `<datalist>`.
+  Generates a list of options for a currency list that can be used with `Phoenix.HTML.Form.options_for_select/2` or to create a `<datalist>`.
 
   ### Arguments
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
   See `Localize.HTML.Currency.select/3` for options.
+
+  ### Returns
+
+  * A list of `{display_name, currency_code}` tuples, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   """
   @spec currency_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
@@ -92,8 +97,6 @@ defmodule Localize.HTML.Currency do
   defp select(_form, _field, {:error, reason}, _selected) do
     {:error, reason}
   end
-
-  @omit_from_select_options [:currencies, :locale, :mapper, :collator]
 
   defp select(form, field, options, _selected) do
     select_options =

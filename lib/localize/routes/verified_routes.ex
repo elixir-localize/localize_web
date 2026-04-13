@@ -1,35 +1,32 @@
 defmodule Localize.VerifiedRoutes do
   @moduledoc """
-  Implements localized verified routes using the `~q` sigil.
+  Localized verified routes using the `~q` sigil.
 
-  Instead of configuring with `use Phoenix.VerifiedRoutes`,
-  configure instead:
+  This module provides compile-time verified localized routes. Instead of configuring with `use Phoenix.VerifiedRoutes`, configure instead:
 
       use Localize.VerifiedRoutes,
         router: MyApp.Router,
         endpoint: MyApp.Endpoint,
         gettext: MyApp.Gettext
 
-  When configured, the sigil `~q` is made available to express
-  localized verified routes. Sigil `~p` remains available for
-  non-localized verified routes.
+  When configured, the sigil `~q` is made available to express localized verified routes. Sigil `~p` remains available for non-localized verified routes.
 
-  The `~q` sigil generates a `case` statement that dispatches
-  to the appropriate localized `~p` route based on the current
-  locale:
+  The `~q` sigil generates a `case` statement that dispatches to the appropriate localized `~p` route based on the current locale:
 
       # ~q"/users" generates:
       case Localize.get_locale().cldr_locale_id do
-        :de -> ~p"/users_de"
+        :de -> ~p"/benutzer"
         :en -> ~p"/users"
-        :fr -> ~p"/users_fr"
+        :fr -> ~p"/utilisateurs"
       end
 
-  ### Locale interpolation
+  ### Locale Interpolation
 
-  `:locale` is replaced with the CLDR locale name.
-  `:language` is replaced with the CLDR language code.
-  `:territory` is replaced with the CLDR territory code.
+  * `:locale` is replaced with the CLDR locale name.
+
+  * `:language` is replaced with the CLDR language code.
+
+  * `:territory` is replaced with the CLDR territory code.
 
   """
 
@@ -49,7 +46,9 @@ defmodule Localize.VerifiedRoutes do
   end
 
   @doc """
-  Sigil_q implements localized verified routes.
+  Implements the `~q` sigil for localized verified routes.
+
+  Generates a `case` expression that dispatches to the translated `~p` route for the current locale. The route path is verified at compile time against the router.
 
   """
   defmacro sigil_q({:<<>>, _meta, _segments} = route, flags) do

@@ -1,6 +1,8 @@
 defmodule Localize.HTML.Territory do
   @moduledoc """
-  Implements an HTML Form select for localised territory display.
+  Generates HTML `<select>` tags and option lists for localized territory display.
+
+  Territories are displayed with their Unicode flag emoji and localized name. The list of territories, display style, sort order, and display format are all configurable.
 
   """
 
@@ -26,41 +28,37 @@ defmodule Localize.HTML.Territory do
   @omit_from_select_options [:territories, :locale, :mapper, :collator, :style]
 
   @doc """
-  Generate an HTML select tag for a territory list
-  that can be used with a `Phoenix.HTML.Form.t`.
+  Generates an HTML select tag for a territory list that can be used with a `Phoenix.HTML.Form.t`.
 
   ### Arguments
 
-  * A `t:Phoenix.HTML.Form.t/0` form.
+  * `form` is a `t:Phoenix.HTML.Form.t/0` form.
 
-  * A `t:Phoenix.HTML.Form.field/0` field.
+  * `field` is a `t:Phoenix.HTML.Form.field/0` field.
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
-  * `:territories` defines the list of territories to be displayed
-    in the select tag. The default is
-    `Localize.Territory.country_codes/0`.
+  * `:territories` defines the list of territories to be displayed in the select tag. The default is `Localize.Territory.territory_codes/0`.
 
-  * `:style` is the format of the territory name. The options are
-    `:standard` (the default), `:short` and `:variant`.
+  * `:style` is the format of the territory name. The options are `:standard` (the default), `:short` and `:variant`.
 
-  * `:locale` defines the locale to be used to localise the
-    description of the territories. The default is the locale
-    returned by `Localize.get_locale/0`.
+  * `:locale` defines the locale to be used to localise the description of the territories. The default is the locale returned by `Localize.get_locale/0`.
 
-  * `:collator` is a function used to sort the territories.
-    The default collator sorts by name.
+  * `:collator` is a function used to sort the territories. The default collator sorts by name.
 
-  * `:mapper` is a function that creates the text to be displayed
-    in the select tag for each territory. The default function is
-    `&({&1.flag <> " " <> &1.name, &1.territory_code})`.
+  * `:mapper` is a function that creates the text to be displayed in the select tag for each territory. The default function is `&({&1.flag <> " " <> &1.name, &1.territory_code})`.
 
-  * `:selected` identifies the territory that is to be selected
-    by default in the select tag. The default is `nil`.
+  * `:selected` identifies the territory that is to be selected by default in the select tag. The default is `nil`.
 
   * `:prompt` is a prompt displayed at the top of the select box.
+
+  ### Returns
+
+  * A `t:Phoenix.HTML.safe/0` select tag, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   ### Examples
 
@@ -82,17 +80,21 @@ defmodule Localize.HTML.Territory do
   end
 
   @doc """
-  Generate a list of options for a territory list that can be used
-  with `Phoenix.HTML.Form.options_for_select/2` or to create a
-  `<datalist>`.
+  Generates a list of options for a territory list that can be used with `Phoenix.HTML.Form.options_for_select/2` or to create a `<datalist>`.
 
   ### Arguments
 
-  * A `t:Keyword.t/0` list of options.
+  * `options` is a `t:Keyword.t/0` list of options.
 
   ### Options
 
   See `Localize.HTML.Territory.select/3` for options.
+
+  ### Returns
+
+  * A list of `{display_name, territory_code}` tuples, or
+
+  * `{:error, {module(), binary()}}` if validation fails.
 
   """
   @spec territory_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
@@ -122,7 +124,7 @@ defmodule Localize.HTML.Territory do
 
   defp default_options do
     Map.new(
-      territories: Localize.Territory.country_codes(),
+      territories: Localize.Territory.territory_codes(),
       locale: Localize.get_locale(),
       collator: &default_collator/1,
       mapper: &{&1.flag <> " " <> &1.name, &1.territory_code},

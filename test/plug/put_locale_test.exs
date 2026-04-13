@@ -11,26 +11,10 @@ defmodule Localize.Plug.PutLocaleTest do
   describe "init/1" do
     test "default options" do
       options = PutLocale.init([])
-      assert options[:apps] == [:localize, :gettext]
       assert options[:from] == [:session, :accept_language, :query, :path, :route]
       assert options[:param] == "locale"
+      assert options[:gettext] == []
       assert %Localize.LanguageTag{} = options[:default]
-    end
-
-    test "accepts valid :apps option" do
-      options = PutLocale.init(apps: [:localize])
-      assert options[:apps] == [:localize]
-    end
-
-    test "accepts a single atom for :apps" do
-      options = PutLocale.init(apps: :localize)
-      assert options[:apps] == [:localize]
-    end
-
-    test "raises on invalid :apps option" do
-      assert_raise ArgumentError, ~r/Invalid app/, fn ->
-        PutLocale.init(apps: [:invalid])
-      end
     end
 
     test "accepts valid :from option" do
@@ -85,6 +69,21 @@ defmodule Localize.Plug.PutLocaleTest do
         PutLocale.init(default: "!!!")
       end
     end
+
+    test "accepts a single gettext backend" do
+      options = PutLocale.init(gettext: MyApp.Gettext)
+      assert options[:gettext] == [MyApp.Gettext]
+    end
+
+    test "accepts a list of gettext backends" do
+      options = PutLocale.init(gettext: [MyApp.Gettext])
+      assert options[:gettext] == [MyApp.Gettext]
+    end
+
+    test "defaults gettext to empty list" do
+      options = PutLocale.init([])
+      assert options[:gettext] == []
+    end
   end
 
   describe "session_key/0" do
@@ -95,7 +94,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - set locale from query param" do
     test "sets locale from query parameter" do
-      options = PutLocale.init(from: [:query], apps: [:localize])
+      options = PutLocale.init(from: [:query])
 
       conn =
         :get
@@ -109,7 +108,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "uses custom param name from query" do
-      options = PutLocale.init(from: [:query], apps: [:localize], param: "lang")
+      options = PutLocale.init(from: [:query], param: "lang")
 
       conn =
         :get
@@ -122,7 +121,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "falls back to default when no query param is present" do
-      options = PutLocale.init(from: [:query], apps: [:localize])
+      options = PutLocale.init(from: [:query])
 
       conn =
         :get
@@ -137,7 +136,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - set locale from body param" do
     test "sets locale from body parameter" do
-      options = PutLocale.init(from: [:body], apps: [:localize])
+      options = PutLocale.init(from: [:body])
 
       conn =
         :post
@@ -153,7 +152,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - set locale from cookie" do
     test "sets locale from cookie" do
-      options = PutLocale.init(from: [:cookie], apps: [:localize])
+      options = PutLocale.init(from: [:cookie])
 
       conn =
         :get
@@ -169,7 +168,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "falls back to default when cookie is not present" do
-      options = PutLocale.init(from: [:cookie], apps: [:localize])
+      options = PutLocale.init(from: [:cookie])
 
       conn =
         :get
@@ -184,7 +183,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - set locale from accept-language header" do
     test "sets locale from accept-language header" do
-      options = PutLocale.init(from: [:accept_language], apps: [:localize])
+      options = PutLocale.init(from: [:accept_language])
 
       conn =
         :get
@@ -197,8 +196,9 @@ defmodule Localize.Plug.PutLocaleTest do
       assert locale.language == :fr
     end
 
+    @tag :capture_log
     test "falls back to default when accept-language has no valid locale" do
-      options = PutLocale.init(from: [:accept_language], apps: [:localize])
+      options = PutLocale.init(from: [:accept_language])
 
       conn =
         :get
@@ -212,7 +212,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "selects highest quality matching locale" do
-      options = PutLocale.init(from: [:accept_language], apps: [:localize])
+      options = PutLocale.init(from: [:accept_language])
 
       conn =
         :get
@@ -227,7 +227,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - set locale from host" do
     test "sets locale from host TLD" do
-      options = PutLocale.init(from: [:host], apps: [:localize])
+      options = PutLocale.init(from: [:host])
 
       conn =
         :get
@@ -240,7 +240,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "sets locale from .au TLD" do
-      options = PutLocale.init(from: [:host], apps: [:localize])
+      options = PutLocale.init(from: [:host])
 
       conn =
         :get
@@ -253,7 +253,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "does not set locale from generic TLD" do
-      options = PutLocale.init(from: [:host], apps: [:localize])
+      options = PutLocale.init(from: [:host])
 
       conn =
         :get
@@ -268,7 +268,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - set locale from MFA" do
     test "sets locale from {Module, function}" do
-      options = PutLocale.init(from: [{MyModule, :get_locale}], apps: [:localize])
+      options = PutLocale.init(from: [{MyModule, :get_locale}])
 
       conn =
         :get
@@ -282,7 +282,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "sets locale from {Module, function, args}" do
-      options = PutLocale.init(from: [{MyModule, :get_locale, [:fred]}], apps: [:localize])
+      options = PutLocale.init(from: [{MyModule, :get_locale, [:fred]}])
 
       conn =
         :get
@@ -298,8 +298,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - priority ordering" do
     test "earlier sources in :from take priority" do
-      options =
-        PutLocale.init(from: [:query, :accept_language], apps: [:localize])
+      options = PutLocale.init(from: [:query, :accept_language])
 
       conn =
         :get
@@ -312,8 +311,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "falls through to next source when first has no locale" do
-      options =
-        PutLocale.init(from: [:query, :accept_language], apps: [:localize])
+      options = PutLocale.init(from: [:query, :accept_language])
 
       conn =
         :get
@@ -328,7 +326,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "call/2 - default locale" do
     test "uses default locale when no source provides one" do
-      options = PutLocale.init(from: [:query], apps: [:localize])
+      options = PutLocale.init(from: [:query])
 
       conn =
         :get
@@ -341,7 +339,7 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "does not set locale when default is :none and no locale found" do
-      options = PutLocale.init(from: [:query], apps: [:localize], default: :none)
+      options = PutLocale.init(from: [:query], default: :none)
 
       conn =
         :get
@@ -355,7 +353,6 @@ defmodule Localize.Plug.PutLocaleTest do
       options =
         PutLocale.init(
           from: [:query],
-          apps: [:localize],
           default: {MyModule, :get_locale}
         )
 
@@ -370,8 +367,8 @@ defmodule Localize.Plug.PutLocaleTest do
   end
 
   describe "call/2 - sets Localize process locale" do
-    test "sets the Localize process locale" do
-      options = PutLocale.init(from: [:query], apps: [:localize])
+    test "always sets the Localize process locale" do
+      options = PutLocale.init(from: [:query])
 
       :get
       |> conn("/?locale=de")
@@ -380,6 +377,18 @@ defmodule Localize.Plug.PutLocaleTest do
       process_locale = Localize.get_locale()
       assert %Localize.LanguageTag{} = process_locale
       assert process_locale.cldr_locale_id == :de
+    end
+  end
+
+  describe "call/2 - sets Gettext locale" do
+    test "sets locale on configured gettext backend" do
+      options = PutLocale.init(from: [:query], gettext: MyApp.Gettext)
+
+      :get
+      |> conn("/?locale=fr")
+      |> PutLocale.call(options)
+
+      assert Gettext.get_locale(MyApp.Gettext) == "fr"
     end
   end
 
@@ -405,7 +414,7 @@ defmodule Localize.Plug.PutLocaleTest do
 
   describe "get_locale/1" do
     test "returns locale from conn" do
-      options = PutLocale.init(from: [:query], apps: [:localize])
+      options = PutLocale.init(from: [:query])
 
       conn =
         :get

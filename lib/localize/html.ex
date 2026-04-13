@@ -1,7 +1,18 @@
 defmodule Localize.HTML do
   @moduledoc """
-  Implements HTML Form selects for localized display of
-  [Localize](https://hex.pm/packages/localize)-based data.
+  Facade module providing HTML form select helpers for localized data.
+
+  This module delegates to specialized submodules that generate `<select>` tags and option lists for currencies, territories, locales, units of measure, and months. Each helper localizes display names according to the current or specified locale using the [Localize](https://hex.pm/packages/localize) library.
+
+  ## Delegate Functions
+
+  * `currency_select/3` and `currency_options/1` — see `Localize.HTML.Currency`.
+
+  * `territory_select/3` and `territory_options/1` — see `Localize.HTML.Territory`.
+
+  * `locale_select/3` and `locale_options/1` — see `Localize.HTML.Locale`.
+
+  * `unit_select/3` and `unit_options/1` — see `Localize.HTML.Unit`.
 
   """
 

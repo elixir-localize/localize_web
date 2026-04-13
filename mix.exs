@@ -10,12 +10,49 @@ defmodule LocalizeWeb.MixProject do
       elixir: "~> 1.17",
       name: "Localize Web",
       description: description(),
+      source_url: "https://github.com/kipcole9/localize_web",
+      docs: docs(),
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       dialyzer: [
         plt_add_apps: ~w(gettext phoenix phoenix_live_view phoenix_html)a
       ]
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: [
+        "README.md",
+        "guides/phoenix-localization-plugs.md",
+        "guides/phoenix-localized-routing.md",
+        "guides/localized-html-helpers.md"
+      ],
+      groups_for_modules: [
+        Plugs: [
+          Localize.Plug,
+          Localize.Plug.PutLocale,
+          Localize.Plug.PutSession,
+          Localize.Plug.AcceptLanguage,
+          Localize.AcceptLanguage
+        ],
+        Routes: [
+          Localize.Routes,
+          Localize.VerifiedRoutes,
+          Localize.Routes.LocalizedHelpers
+        ],
+        "HTML Helpers": [
+          Localize.HTML,
+          Localize.HTML.Currency,
+          Localize.HTML.Territory,
+          Localize.HTML.Locale,
+          Localize.HTML.Unit,
+          Localize.HTML.Month
+        ]
+      ],
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md", "Localize.AcceptLanguage"]
     ]
   end
 
@@ -33,7 +70,7 @@ defmodule LocalizeWeb.MixProject do
 
   defp deps do
     [
-      {:localize, path: "../localize"},
+      {:localize, "~> 0.4"},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},
       {:phoenix, "~> 1.7", optional: true},

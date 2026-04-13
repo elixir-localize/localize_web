@@ -2,65 +2,58 @@ defmodule Localize.Plug.PutLocale do
   @private_key :localize_locale
   @session_key "localize_locale"
 
-  @default_apps [:localize, :gettext]
   @default_from [:session, :accept_language, :query, :path, :route]
   @default_param_name "locale"
 
   @moduledoc """
-  Puts the Localize and/or Gettext locales derived from the accept-language
-  header, a query parameter, a url parameter, a body parameter, the route
-  or the session for the current process.
+  Plug that discovers and sets the locale for the current process.
 
-  ## Options
+  The locale can be derived from the accept-language header, a query parameter, a URL parameter, a body parameter, a cookie, the route, the session, or the hostname TLD. Sources are checked in the order specified by the `:from` option, and the first successful match wins.
 
-  * `:apps` - list of apps for which to set locale. Valid values
-    are `:localize` and `:gettext`. The default is
-    `#{inspect(@default_apps)}`.
+  When a locale is found, `Localize.put_locale/1` is always called to set the process locale. If Gettext backends are configured, the locale is also set on each backend.
 
-  * `:from` - where in the request to look for the locale.
-    The default is `#{inspect(@default_from)}`. The valid
-    options are:
-    * `:accept_language` will parse the `accept-language` header
-       and find the best matched configured locale.
+  If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`.
+
+  ### Options
+
+  * `:from` is a list specifying where in the request to look for the locale. The default is `#{inspect(@default_from)}`. The valid options are:
+
+    * `:accept_language` will parse the `accept-language` header and find the best matched configured locale.
+
     * `:path` will look for a locale by examining `conn.path_params`.
+
     * `:query` will look for a locale by examining `conn.query_params`.
+
     * `:body` will look for a locale by examining `conn.body_params`.
+
     * `:cookie` will look for a locale in the request cookie(s).
+
     * `:session` will look for a locale in the session.
-    * `:route` will look for a locale in the route that was
-      matched under the key `private.#{inspect(@private_key)}`.
-    * `:host` will attempt to resolve a locale from the host name
-      top-level domain.
-    * `{Module, function, args}` in which case the indicated function
-      will be called. If it returns `{:ok, locale}` then the locale
-      is set. `locale` must be a `t:Localize.LanguageTag.t/0`.
-    * `{Module, function}` in which case the function is called with
-      `conn` and `options` as its two arguments.
 
-  * `:default` - the default locale to set if no locale is found
-    by other configured methods. It can be a string like "en"
-    or a `Localize.LanguageTag` struct. It may also be `:none` to
-    indicate that no locale is to be set by default. Lastly, it
-    may also be a `{Module, function, args}` or `{Module, function}`
-    tuple. The default is `Localize.default_locale/0`.
+    * `:route` will look for a locale in the route that was matched under the key `private.#{inspect(@private_key)}`.
 
-  * `:gettext` - the name of the `Gettext` backend module upon which
-    the locale will be set. Required if `:gettext` is in the `:apps`
-    list.
+    * `:host` will attempt to resolve a locale from the hostname top-level domain.
 
-  * `:param` - the name of the parameter to look for in the query,
-    path, body, or cookie. The default is `"locale"`.
+    * `{Module, function, args}` in which case the indicated function will be called. If it returns `{:ok, locale}` then the locale is set. `locale` must be a `t:Localize.LanguageTag.t/0`.
 
-  If a locale is found then `conn.private[:localize_locale]` is also set.
-  It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`.
+    * `{Module, function}` in which case the function is called with `conn` and `options` as its two arguments.
 
-  ## Examples
+  * `:default` is the default locale to set if no locale is found by other configured methods. It can be a string like `"en"` or a `Localize.LanguageTag` struct. It may also be `:none` to indicate that no locale is to be set by default. Lastly, it may also be a `{Module, function, args}` or `{Module, function}` tuple. The default is `Localize.default_locale/0`.
+
+  * `:gettext` is a Gettext backend module or a list of Gettext backend modules on which the locale will be set. The default is `[]` (no Gettext backends).
+
+  * `:param` is the name of the parameter to look for in the query, path, body, or cookie. The default is `"locale"`.
+
+  ### Examples
 
       plug Localize.Plug.PutLocale,
-        apps: [:localize, :gettext],
         from: [:query, :path, :body, :cookie, :accept_language],
         param: "locale",
         gettext: MyApp.Gettext
+
+      plug Localize.Plug.PutLocale,
+        from: [:route, :session, :accept_language],
+        gettext: [MyApp.Gettext, MyOtherApp.Gettext]
 
   """
 
@@ -77,7 +70,6 @@ defmodule Localize.Plug.PutLocale do
     :host,
     :route
   ]
-  @app_options [:localize, :gettext]
 
   @language_header "accept-language"
 
@@ -86,7 +78,6 @@ defmodule Localize.Plug.PutLocale do
   @doc false
   def init(options) do
     options
-    |> validate_apps(options[:apps])
     |> validate_from(options[:from])
     |> validate_param(options[:param])
     |> validate_gettext(options[:gettext])
@@ -96,13 +87,29 @@ defmodule Localize.Plug.PutLocale do
   @doc false
   def call(conn, options) do
     if locale = locale_from_params(conn, options[:from], options) || default(conn, options) do
-      Enum.each(options[:apps], fn app ->
-        put_locale(app, locale, options)
+      Localize.put_locale(locale)
+
+      Enum.each(options[:gettext], fn gettext_backend ->
+        put_gettext_locale(gettext_backend, locale)
       end)
 
       put_private(conn, @private_key, locale)
     else
       conn
+    end
+  end
+
+  defp put_gettext_locale(gettext_backend, locale) do
+    case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
+      {:ok, gettext_locale} ->
+        Gettext.put_locale(gettext_backend, gettext_locale)
+
+      {:error, _reason} ->
+        Logger.warning(
+          "Localize.Plug.PutLocale: locale #{inspect(locale.cldr_locale_id)} does not have " <>
+            "a matching Gettext locale for backend #{inspect(gettext_backend)}. " <>
+            "No Gettext locale has been set."
+        )
     end
   end
 
@@ -139,7 +146,15 @@ defmodule Localize.Plug.PutLocale do
   end
 
   @doc """
-  Return the locale set by `Localize.Plug.PutLocale`.
+  Returns the locale set by `Localize.Plug.PutLocale`.
+
+  ### Arguments
+
+  * `conn` is a `t:Plug.Conn.t/0`.
+
+  ### Returns
+
+  * A `t:Localize.LanguageTag.t/0` or `nil`.
 
   """
   def get_locale(conn) do
@@ -285,51 +300,6 @@ defmodule Localize.Plug.PutLocale do
     {:cont, nil}
   end
 
-  defp put_locale(:localize, locale, _options) do
-    Localize.put_locale(locale)
-  end
-
-  defp put_locale(:gettext, locale, options) do
-    gettext_backend = options[:gettext]
-
-    if gettext_backend do
-      case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
-        {:ok, gettext_locale} ->
-          Gettext.put_locale(gettext_backend, gettext_locale)
-
-        {:error, _reason} ->
-          Logger.warning(
-            "Locale #{inspect(locale.cldr_locale_id)} does not have a known " <>
-              "Gettext locale. No Gettext locale has been set."
-          )
-      end
-    else
-      Logger.warning(
-        "No Gettext backend configured. Gettext locale cannot be set. " <>
-          "Pass the :gettext option to Localize.Plug.PutLocale."
-      )
-    end
-  end
-
-  defp validate_apps(options, nil), do: Keyword.put(options, :apps, @default_apps)
-
-  defp validate_apps(options, app) when is_atom(app) do
-    options
-    |> Keyword.put(:apps, [app])
-    |> validate_apps([app])
-  end
-
-  defp validate_apps(options, apps) when is_list(apps) do
-    Enum.each(apps, fn app ->
-      unless app in @app_options do
-        raise ArgumentError,
-              "Invalid app #{inspect(app)}. Valid apps are #{inspect(@app_options)}"
-      end
-    end)
-
-    Keyword.put(options, :apps, apps)
-  end
-
   defp validate_from(options, nil), do: Keyword.put(options, :from, @default_from)
 
   defp validate_from(options, from) when is_atom(from) do
@@ -397,15 +367,23 @@ defmodule Localize.Plug.PutLocale do
     end
   end
 
-  defp validate_gettext(options, nil), do: options
+  defp validate_gettext(options, nil), do: Keyword.put(options, :gettext, [])
 
-  defp validate_gettext(options, gettext) when is_atom(gettext) do
-    case Code.ensure_compiled(gettext) do
-      {:error, _} ->
-        raise ArgumentError, "Gettext module #{inspect(gettext)} is not known"
+  defp validate_gettext(options, backend) when is_atom(backend) do
+    validate_gettext(options, [backend])
+  end
 
-      {:module, _} ->
-        Keyword.put(options, :gettext, gettext)
-    end
+  defp validate_gettext(options, backends) when is_list(backends) do
+    Enum.each(backends, fn backend ->
+      case Code.ensure_compiled(backend) do
+        {:error, _} ->
+          raise ArgumentError, "Gettext module #{inspect(backend)} is not known"
+
+        {:module, _} ->
+          :ok
+      end
+    end)
+
+    Keyword.put(options, :gettext, backends)
   end
 end
