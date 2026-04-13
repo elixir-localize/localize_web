@@ -22,3 +22,8 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 localize_web-*.tar
 
+# Mise and Asdf
+mise.toml
+.tool-version
+
+
