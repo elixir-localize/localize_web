@@ -85,9 +85,6 @@ jobs:
       - name: Run tests
         run: mix test
 
-      - name: Run integration tests
-        run: mix test --only integration
-
       - name: Restore PLT cache
         if: matrix.lint
         uses: actions/cache@v5

@@ -1,12 +1,15 @@
 defmodule Localize.Plug.AcceptLanguage do
   @moduledoc """
-  Standalone plug that parses the `Accept-Language` header and sets `conn.private[:localize_locale]` to the best matching locale.
+  Standalone plug that parses the `Accept-Language` header and sets `conn.private[:localize_locale]` to the
+  best matching locale.
 
-  The locale can be later retrieved by `Localize.Plug.AcceptLanguage.get_locale/1`. This plug is useful when you only need accept-language parsing without the full locale discovery pipeline of `Localize.Plug.PutLocale`.
+  The locale can be later retrieved by `Localize.Plug.AcceptLanguage.get_locale/1`. This plug is useful
+  when you only need accept-language parsing without the full locale discovery pipeline of `Localize.Plug.PutLocale`.
 
   ### Options
 
-  * `:no_match_log_level` determines the logging level for the case when no matching locale is configured to meet the user's request. The default is `:warning`. If set to `nil` then no logging is performed.
+  * `:no_match_log_level` determines the logging level for the case when no matching locale is configured to meet the user's
+    request. The default is `:warning`. If set to `nil` then no logging is performed.
 
   ### Examples
 
