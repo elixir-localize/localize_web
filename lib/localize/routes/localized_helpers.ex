@@ -56,14 +56,35 @@ defmodule Localize.Routes.LocalizedHelpers do
   end
 
   defp localized_helpers(groups) do
-    for {_helper, helper_routes} <- groups,
-        {_, [{route, exprs} | _]} <- routes_in_order(helper_routes),
-        suffix <- @known_suffixes,
-        localized_route?(route) do
-      helper_fun_name = strip_locale(route.helper)
-      {_bins, vars} = :lists.unzip(exprs.binding)
+    seen = :sets.new()
 
-      quote do
+    {helpers, _} =
+      Enum.flat_map_reduce(groups, seen, fn {_helper, helper_routes}, seen ->
+        entries =
+          for {_, [{route, exprs} | _]} <- routes_in_order(helper_routes),
+              suffix <- @known_suffixes,
+              localized_route?(route) do
+            helper_fun_name = strip_locale(route.helper)
+            {_bins, vars} = :lists.unzip(exprs.binding)
+            {helper_fun_name, suffix, vars}
+          end
+
+        {new_entries, seen} =
+          Enum.flat_map_reduce(entries, seen, fn {name, suffix, vars} = entry, seen ->
+            key = {name, suffix, length(vars)}
+
+            if :sets.is_element(key, seen) do
+              {[], seen}
+            else
+              {[entry], :sets.add_element(key, seen)}
+            end
+          end)
+
+        {new_entries, seen}
+      end)
+
+    Enum.map(helpers, fn {helper_fun_name, suffix, vars} ->
+      quote generated: true do
         def unquote(:"#{helper_fun_name}_#{suffix}")(
               conn_or_endpoint,
               plug_opts,
@@ -101,7 +122,7 @@ defmodule Localize.Routes.LocalizedHelpers do
           )
         end
       end
-    end
+    end)
   end
 
   defp non_localized_helpers(groups, helper_module) do
@@ -111,7 +132,7 @@ defmodule Localize.Routes.LocalizedHelpers do
         !localized_route?(route) do
       {_bins, vars} = :lists.unzip(exprs.binding)
 
-      quote do
+      quote generated: true do
         def unquote(:"#{route.helper}_#{suffix}")(
               conn_or_endpoint,
               plug_opts,
@@ -158,7 +179,7 @@ defmodule Localize.Routes.LocalizedHelpers do
         helper_fun_name != route.helper do
       {_bins, vars} = :lists.unzip(exprs.binding)
 
-      quote do
+      quote generated: true do
         @doc false
         def helper(
               unquote(helper_fun_name),
@@ -203,7 +224,7 @@ defmodule Localize.Routes.LocalizedHelpers do
           binding = List.duplicate({:_, [], nil}, length)
           arity = length + 2
 
-          quote do
+          quote generated: true do
             def helper(
                   unquote(proxy_helper),
                   suffix,
@@ -233,7 +254,7 @@ defmodule Localize.Routes.LocalizedHelpers do
           binding = List.duplicate({:_, [], nil}, length)
           arity = length + 2
 
-          quote do
+          quote generated: true do
             def helper(
                   unquote(proxy_helper),
                   suffix,
