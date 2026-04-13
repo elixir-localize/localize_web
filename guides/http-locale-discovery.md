@@ -1,6 +1,6 @@
-# Phoenix Localization Plugs
+# HTTP Locale Discovery
 
-This guide covers setting up locale discovery and session persistence in a Phoenix application using the localization plugs provided by `localize_web`.
+This guide covers detecting the user's locale from HTTP requests, persisting it in the session, and restoring it in LiveView using the plugs provided by `localize_web`.
 
 ## Prerequisites
 
@@ -22,6 +22,16 @@ Define a Gettext backend if you don't already have one:
 # lib/my_app/gettext.ex
 defmodule MyApp.Gettext do
   use Gettext.Backend, otp_app: :my_app
+end
+```
+
+As an alternative to standard Gettext interpolation, you can configure the backend to use [ICU MessageFormat 2](https://hexdocs.pm/localize/Localize.Gettext.Interpolation.html) for richer message formatting including plural rules, select expressions, and number/date formatting:
+
+```elixir
+defmodule MyApp.Gettext do
+  use Gettext.Backend,
+    otp_app: :my_app,
+    interpolation: Localize.Gettext.Interpolation
 end
 ```
 
@@ -98,6 +108,8 @@ plug Localize.Plug.PutLocale, gettext: [MyApp.Gettext, MyOtherApp.Gettext]
 ```
 
 When omitted, only the Localize process locale is set and no Gettext locale is configured.
+
+The Gettext backend can use either the standard Gettext interpolation or the [Localize.Gettext.Interpolation](https://hexdocs.pm/localize/Localize.Gettext.Interpolation.html) module which supports ICU MessageFormat 2 (MF2). MF2 provides locale-aware plural rules, select expressions, and number/date formatting directly in your translation strings. See the [Localize.Message documentation](https://hexdocs.pm/localize/Localize.Message.html) for the full MF2 syntax reference.
 
 ### The Default Locale
 

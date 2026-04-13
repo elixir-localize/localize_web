@@ -22,6 +22,12 @@ defmodule LocalizeWeb.MixProject do
     ]
   end
 
+  defp description do
+    """
+    Plugs, localized routes, and HTML helpers for the Localize library.
+    """
+  end
+
   defp package do
     [
       licenses: ["Apache-2.0"],
@@ -36,12 +42,20 @@ defmodule LocalizeWeb.MixProject do
   defp docs do
     [
       main: "readme",
+      formatters: ["html", "markdown"],
       extras: [
         "README.md",
         "CHANGELOG.md",
-        "guides/phoenix-localization-plugs.md",
+        "guides/http-locale-discovery.md",
         "guides/phoenix-localized-routing.md",
         "guides/localized-html-helpers.md"
+      ],
+      groups_for_extras: [
+        Guides: [
+          "guides/http-locale-discovery.md",
+          "guides/phoenix-localized-routing.md",
+          "guides/localized-html-helpers.md"
+        ]
       ],
       groups_for_modules: [
         Plugs: [
@@ -67,12 +81,6 @@ defmodule LocalizeWeb.MixProject do
       ],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md", "Localize.AcceptLanguage"]
     ]
-  end
-
-  defp description do
-    """
-    Plugs, localized routes, and HTML helpers for the Localize library.
-    """
   end
 
   def application do

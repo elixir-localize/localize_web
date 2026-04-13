@@ -7,15 +7,15 @@ Phoenix integration for the [Localize](https://hex.pm/packages/localize) library
 
 ## Features
 
-* **Locale Discovery Plugs** — detect the user's locale from the accept-language header, query parameters, URL path, session, cookies, hostname TLD, or custom functions.
+* **[Locale Discovery](https://hexdocs.pm/localize_web/http-locale-discovery.html)** — detect the user's locale from the accept-language header, query parameters, URL path, session, cookies, hostname TLD, or custom functions.
 
-* **Session Persistence** — store the discovered locale in the session for subsequent requests and LiveView connections.
+* **[Session Persistence](https://hexdocs.pm/localize_web/http-locale-discovery.html#persisting-locale-in-the-session)** — store the discovered locale in the session for subsequent requests and LiveView connections.
 
-* **Compile-time Route Localization** — translate route path segments using Gettext at compile time and generate localized routes for each configured locale.
+* **[Compile-time Route Localization](https://hexdocs.pm/localize_web/phoenix-localized-routing.html)** — translate route path segments using Gettext at compile time and generate localized routes for each configured locale.
 
-* **Verified Localized Routes** — the `~q` sigil provides compile-time verified localized routes that dispatch to the correct translated path based on the current locale.
+* **[Verified Localized Routes](https://hexdocs.pm/localize_web/phoenix-localized-routing.html#verified-localized-routes-with-q)** — the `~q` sigil provides compile-time verified localized routes that dispatch to the correct translated path based on the current locale.
 
-* **HTML Form Helpers** — generate `<select>` tags and option lists for currencies, territories, locales, units of measure, and months with localized display names.
+* **[HTML Form Helpers](https://hexdocs.pm/localize_web/localized-html-helpers.html)** — generate `<select>` tags and option lists for currencies, territories, locales, units of measure, and months with localized display names.
 
 ## Installation
 
