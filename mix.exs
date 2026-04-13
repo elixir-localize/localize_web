@@ -92,8 +92,16 @@ defmodule LocalizeWeb.MixProject do
       {:phoenix_live_view, "~> 1.0", optional: true},
       {:jason, "~> 1.0", optional: true},
       {:ex_doc, "~> 0.34", only: [:dev, :release], runtime: false},
-      {:dialyxir, "~> 1.0", only: :dev, runtime: false}
-    ]
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
+    ]++ maybe_json_polyfill()
+  end
+
+  defp maybe_json_polyfill do
+    if Code.ensure_loaded?(:json) do
+      []
+    else
+      [{:json_polyfill, "~> 0.2 or ~> 1.0"}]
+    end
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
