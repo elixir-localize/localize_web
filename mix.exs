@@ -40,7 +40,8 @@ defmodule LocalizeWeb.MixProject do
     %{
       "GitHub" => "https://github.com/elixir-localize/localize_web",
       "Readme" => "https://github.com/elixir-localize/localize_web/blob/v#{@version}/README.md",
-      "Changelog" => "https://github.com/elixir-localize/localize_web/blob/v#{@version}/CHANGELOG.md"
+      "Changelog" =>
+        "https://github.com/elixir-localize/localize_web/blob/v#{@version}/CHANGELOG.md"
     }
   end
 
