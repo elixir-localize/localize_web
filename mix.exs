@@ -31,12 +31,17 @@ defmodule LocalizeWeb.MixProject do
   defp package do
     [
       licenses: ["Apache-2.0"],
-      links: %{
-        "GitHub" => "https://github.com/kipcole9/localize_web",
-        "Changelog" => "https://github.com/kipcole9/localize_web/blob/main/CHANGELOG.md"
-      },
+      links: links(),
       files: ~w(lib priv guides mix.exs README.md LICENSE.md CHANGELOG.md)
     ]
+  end
+
+  def links do
+    %{
+      "GitHub" => "https://github.com/elixir-localize/localize_web",
+      "Readme" => "https://github.com/elixir-localize/localize_web/blob/v#{@version}/README.md",
+      "Changelog" => "https://github.com/elixir-localize/localize_web/blob/v#{@version}/CHANGELOG.md"
+    }
   end
 
   defp docs do
