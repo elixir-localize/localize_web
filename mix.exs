@@ -10,7 +10,7 @@ defmodule LocalizeWeb.MixProject do
       elixir: "~> 1.17",
       name: "Localize Web",
       description: description(),
-      source_url: "https://github.com/kipcole9/localize_web",
+      source_url: "https://github.com/elixir-localize/localize_web",
       package: package(),
       docs: docs(),
       start_permanent: Mix.env() == :prod,
@@ -32,8 +32,8 @@ defmodule LocalizeWeb.MixProject do
     [
       licenses: ["Apache-2.0"],
       links: %{
-        "GitHub" => "https://github.com/kipcole9/localize_web",
-        "Changelog" => "https://github.com/kipcole9/localize_web/blob/main/CHANGELOG.md"
+        "GitHub" => "https://github.com/elixir-localize/localize_web",
+        "Changelog" => "https://github.com/elixir-localize/localize_web/blob/main/CHANGELOG.md"
       },
       files: ~w(lib priv guides mix.exs README.md LICENSE.md CHANGELOG.md)
     ]
