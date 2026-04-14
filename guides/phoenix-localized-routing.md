@@ -266,3 +266,9 @@ mix phx.routes MyApp.Router.LocalizedRoutes
 ```
 
 This shows all generated localized routes with their paths, verbs, and controller actions.
+
+## Acknowledgements
+
+> #### Attribution {: .info}
+>
+> `Localize.Routes` is based on `ex_cldr_routes` which was inspired by the work originally done by [Bart Otten](https://github.com/BartOtten) on `PhxAltRoutes` — which has evolved to the much enhanced [Routex](https://hex.pm/packages/routex). Users seeking a more comprehensive and extensible localized routing solution should consider [Routex](https://hex.pm/packages/routex) as an alternative to `Localize.Routes`.

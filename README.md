@@ -99,3 +99,9 @@ iex> Localize.HTML.Locale.select(:my_form, :locale, selected: "en")
 ## Documentation
 
 Full documentation is available on [HexDocs](https://hexdocs.pm/localize_web).
+
+## Acknowledgements
+
+> #### Attribution {: .info}
+>
+> The localized routing in this library is based on `ex_cldr_routes` which was inspired by the work originally done by [Bart Otten](https://github.com/BartOtten) on `PhxAltRoutes` — which has evolved to the much enhanced [Routex](https://hex.pm/packages/routex). Users seeking a more comprehensive and extensible localized routing solution should consider [Routex](https://hex.pm/packages/routex) as an alternative to `Localize.Routes`.
