@@ -1,7 +1,7 @@
 defmodule LocalizeWeb.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.3.0"
 
   def project do
     [
@@ -102,7 +102,7 @@ defmodule LocalizeWeb.MixProject do
       {:gettext, "~> 1.0"},
       {:phoenix, "~> 1.7", optional: true},
       {:phoenix_html, "~> 4.0"},
-      {:phoenix_html_helpers, "~> 1.0", optional: true},
+      {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_live_view, "~> 1.0", optional: true},
       {:jason, "~> 1.0", optional: true},
       {:ex_doc, "~> 0.34", only: [:dev, :release], runtime: false},
