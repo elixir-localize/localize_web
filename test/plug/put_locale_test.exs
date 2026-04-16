@@ -14,7 +14,9 @@ defmodule Localize.Plug.PutLocaleTest do
       assert options[:from] == [:session, :accept_language, :query, :path, :route]
       assert options[:param] == "locale"
       assert options[:gettext] == []
-      assert %Localize.LanguageTag{} = options[:default]
+      # Default is deferred to request time to avoid loading CLDR data
+      # at compile time. The sentinel is resolved in call/2.
+      assert options[:default] == :__localize_default__
     end
 
     test "accepts valid :from option" do

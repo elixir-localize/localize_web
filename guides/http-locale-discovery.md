@@ -126,6 +126,76 @@ plug Localize.Plug.PutLocale, default: :none
 plug Localize.Plug.PutLocale, default: {MyApp.Locale, :resolve_default}
 ```
 
+### Avoiding Localize Calls at Compile Time
+
+Plug options in a Phoenix router pipeline are evaluated when the module compiles. This means any `Localize.*` function call in a plug option executes during `mix compile`, which forces the Localize application to boot inside the compiler's VM and load CLDR data into memory. On memory-constrained build environments (CI runners, Docker builders, Fly.io remote builders) this can cause the compilation to be killed with an out-of-memory error.
+
+The most common pitfall is using `Localize.default_locale/0` as the `:default` option:
+
+```elixir
+# ❌ Calls Localize.default_locale() at COMPILE TIME — loads CLDR data into the compiler VM.
+plug Localize.Plug.PutLocale,
+  default: Localize.default_locale(),
+  gettext: MyApp.Gettext
+```
+
+Instead, use a static atom or string for the default. The runtime behaviour is identical — `:en` is the default locale unless configured otherwise:
+
+```elixir
+# ✅ Static value — no Localize code runs at compile time.
+plug Localize.Plug.PutLocale,
+  default: :en,
+  gettext: MyApp.Gettext
+```
+
+If you need a dynamic default that reads from application config or system environment, use an MFA tuple so evaluation is deferred to runtime (when each request is processed):
+
+```elixir
+# ✅ MFA tuple — evaluated at runtime, not compile time.
+plug Localize.Plug.PutLocale,
+  default: {MyApp.Locale, :resolve_default},
+  gettext: MyApp.Gettext
+```
+
+```elixir
+defmodule MyApp.Locale do
+  @doc """
+  Returns the default locale at runtime by checking, in order:
+
+  1. The `:default_locale` key in the `:localize` application environment.
+  2. The system `LANG` environment variable (parsed to a BCP-47 tag).
+  3. Falls back to `:en`.
+
+  """
+  def resolve_default do
+    Application.get_env(:localize, :default_locale) ||
+      parse_system_lang() ||
+      :en
+  end
+
+  defp parse_system_lang do
+    case System.get_env("LANG") do
+      nil ->
+        nil
+
+      lang ->
+        # "en_US.UTF-8" → "en-US"; "C" / "POSIX" → nil
+        lang
+        |> String.split(".")
+        |> hd()
+        |> String.replace("_", "-")
+        |> case do
+          "C" -> nil
+          "POSIX" -> nil
+          tag -> tag
+        end
+    end
+  end
+end
+```
+
+The same principle applies anywhere a `Localize.*` function appears in module attributes, `@` attributes, or macro arguments that are evaluated at compile time — use static values or MFA tuples instead.
+
 ## All Locale Sources
 
 Beyond the common sources shown above, `Localize.Plug.PutLocale` supports these additional sources in the `:from` list:

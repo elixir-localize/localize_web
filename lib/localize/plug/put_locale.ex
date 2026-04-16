@@ -38,7 +38,7 @@ defmodule Localize.Plug.PutLocale do
 
     * `{Module, function}` in which case the function is called with `conn` and `options` as its two arguments.
 
-  * `:default` is the default locale to set if no locale is found by other configured methods. It can be a string like `"en"` or a `Localize.LanguageTag` struct. It may also be `:none` to indicate that no locale is to be set by default. Lastly, it may also be a `{Module, function, args}` or `{Module, function}` tuple. The default is `Localize.default_locale/0`.
+  * `:default` is the default locale to set if no locale is found by other configured methods. It can be a string like `"en"` or a `Localize.LanguageTag` struct. It may also be `:none` to indicate that no locale is to be set by default. Lastly, it may also be a `{Module, function, args}` or `{Module, function}` tuple. The default is `Localize.default_locale/0` (resolved at runtime, not compile time).
 
   * `:gettext` is a Gettext backend module or a list of Gettext backend modules on which the locale will be set. The default is `[]` (no Gettext backends).
 
@@ -113,8 +113,14 @@ defmodule Localize.Plug.PutLocale do
     end
   end
 
+  # The :__localize_default__ sentinel defers the Localize.default_locale/0
+  # call from init/1 (compile time) to call/2 (request time). This avoids
+  # loading the full CLDR dataset into the compiler's VM when the plug is
+  # declared in a Phoenix router pipeline — a common cause of OOM errors
+  # on memory-constrained build environments (Docker, CI, Fly.io).
   defp default(conn, options) do
     case options[:default] do
+      :__localize_default__ -> Localize.default_locale()
       {module, function, args} -> get_default(conn, options, module, function, args)
       other -> other
     end
@@ -340,9 +346,14 @@ defmodule Localize.Plug.PutLocale do
           "Invalid :param #{inspect(param)} detected. :param must be a string"
   end
 
+  # When no :default is given, store a sentinel rather than calling
+  # Localize.default_locale() eagerly. Plug.init/1 runs at compile time
+  # inside Phoenix router pipelines; calling into Localize there forces
+  # the CLDR data modules to load in the compiler VM, which can exhaust
+  # memory on constrained builders. The sentinel is resolved to the real
+  # default locale in default/2 at request time.
   defp validate_default(options, nil) do
-    default = Localize.default_locale()
-    Keyword.put(options, :default, default)
+    Keyword.put(options, :default, :__localize_default__)
   end
 
   defp validate_default(options, :none) do
