@@ -116,16 +116,21 @@ defmodule Localize.AcceptLanguage do
     end
   end
 
+  # Split on the `;q=` weight parameter. A well-formed tag has at most one
+  # weight, but real-world Accept-Language headers sometimes contain
+  # duplicates (e.g. `"ja;q=0.9;q=0.9"`). Per RFC 9110 §5.3 duplicates are
+  # invalid, but a lenient parser takes the first weight and ignores the
+  # rest rather than crashing.
   defp parse_tag(segment) do
     case String.split(segment, ";q=") do
-      [tag, quality] ->
+      [tag] ->
+        {1.0, tag}
+
+      [tag, quality | _extra] ->
         case Float.parse(quality) do
           {q, _} -> {q, tag}
           :error -> {1.0, tag}
         end
-
-      [tag] ->
-        {1.0, tag}
     end
   end
 end

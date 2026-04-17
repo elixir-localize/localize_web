@@ -135,6 +135,14 @@ defmodule Localize.AcceptLanguageTest do
       tokens = AcceptLanguage.tokenize("en;")
       assert is_list(tokens)
     end
+
+    test "duplicate q= parameter on a tag uses the first weight" do
+      # Malformed but seen in real-world headers — `q=` appears twice.
+      # Per RFC 9110 §5.3 duplicates are invalid; the parser takes the
+      # first weight rather than crashing.
+      tokens = AcceptLanguage.tokenize("ja-JP,ja;q=0.9;q=0.9,en;q=0.8;q=0.8")
+      assert [{1.0, "ja-jp"}, {0.9, "ja"}, {0.8, "en"}] = tokens
+    end
   end
 
   describe "parse/1" do
@@ -288,6 +296,14 @@ defmodule Localize.AcceptLanguageTest do
 
       {:ok, locale} = AcceptLanguage.best_match(header)
       assert locale.language == :de
+    end
+
+    test "handles malformed header with duplicate q= parameters" do
+      # Regression: `"ja;q=0.9;q=0.9"` previously crashed with a
+      # CaseClauseError because `String.split("ja;q=0.9;q=0.9", ";q=")`
+      # yields three elements. Now it uses the first weight.
+      assert {:ok, %Localize.LanguageTag{language: :ja}} =
+               AcceptLanguage.best_match(" ja-JP,ja;q=0.9;q=0.9,en;q=0.8;q=0.8")
     end
   end
 end
