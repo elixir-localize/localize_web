@@ -20,10 +20,34 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-localize_web-*.tar
+localize-*.tar
 
-# Mise and Asdf
+# mise and asdf
 mise.toml
-.tool-version
+.tool-versions
 
+# object files
+*.so
+*.o
+
+# Generated locale ETF files (populated via mix localize.generate_locales)
+/priv/localize/locales/
+!/priv/localize/locales/en.etf
+!/priv/localize/locales/und.etf
+
+# Experiment files
+bench_unit_parser.sh
+
+# Generated erl files
+/src/*.erl
+
+# Claude
+CLAUDE.md
+.claude/
+/plans
+
+# private
+r2_setup.md
+
+.DS_Store
 
