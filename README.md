@@ -1,7 +1,10 @@
 # Localize Web
 
+![Build status](https://github.com/elixir-localize/localize_web/actions/workflows/ci.yml/badge.svg)
 [![Hex.pm](https://img.shields.io/hexpm/v/localize_web.svg)](https://hex.pm/packages/localize_web)
-[![License](https://img.shields.io/hexpm/l/localize_web.svg)](https://github.com/kipcole9/localize_web/blob/main/LICENSE.md)
+[![Hex.pm](https://img.shields.io/hexpm/dw/localize_web.svg?)](https://hex.pm/packages/localize_web)
+[![Hex.pm](https://img.shields.io/hexpm/dt/localize_web.svg?)](https://hex.pm/packages/localize_web)
+[![Hex.pm](https://img.shields.io/hexpm/l/localize_web.svg)](https://hex.pm/packages/localize_web)
 
 Phoenix integration for the [Localize](https://hex.pm/packages/localize) library providing plugs for locale discovery, compile-time route localization, and HTML form helpers for localized data.
 
