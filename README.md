@@ -36,15 +36,25 @@ end
 
 ### Locale Discovery
 
-Add the locale plugs to your Phoenix endpoint or router pipeline:
+Add the locale plugs to your Phoenix browser pipeline after `fetch_session`:
 
 ```elixir
-plug Localize.Plug.PutLocale,
-  from: [:session, :accept_language, :query, :path],
-  gettext: MyApp.Gettext
+pipeline :browser do
+  plug :accepts, ["html"]
+  plug :fetch_session
 
-plug Localize.Plug.PutSession
+  plug Localize.Plug.PutLocale,
+    from: [:session, :accept_language, :query, :path],
+    gettext: MyApp.Gettext
+
+  plug Localize.Plug.PutSession
+end
 ```
+
+`Localize.Plug.PutLocale` reads the `:session` source with
+`Plug.Conn.get_session/2`, so `fetch_session` must run first. If `:cookie` is
+used outside a browser/session pipeline, fetch cookies before `PutLocale`;
+`fetch_session` already does that in the browser pipeline.
 
 ### LiveView Support
 
