@@ -1,6 +1,13 @@
 defmodule Localize.AcceptLanguageTest do
   use ExUnit.Case, async: true
 
+  @moduledoc """
+  Covers Accept-Language tokenization and best-match selection.
+
+  These tests use real `Localize` locale validation and do not cover every
+  malformed HTTP header shape.
+  """
+
   alias Localize.AcceptLanguage
 
   describe "tokenize/1" do
@@ -39,6 +46,14 @@ defmodule Localize.AcceptLanguageTest do
     test "wildcard with q=0 is filtered out" do
       tokens = AcceptLanguage.tokenize("fr;q=0.9, *;q=0")
       assert [{0.9, "fr"}] = tokens
+    end
+
+    test "language tags with q=0 are filtered out" do
+      assert [{0.5, "en"}] = AcceptLanguage.tokenize("fr;q=0,en;q=0.5")
+    end
+
+    test "language tags with q greater than 1 are filtered out" do
+      assert [{1.0, "fr"}] = AcceptLanguage.tokenize("en;q=2,fr;q=1")
     end
 
     test "spaces after commas and around values" do
@@ -190,6 +205,15 @@ defmodule Localize.AcceptLanguageTest do
 
     test "returns error for wildcard-only" do
       assert {:error, _} = AcceptLanguage.best_match("*")
+    end
+
+    test "returns error when all language tags have q=0" do
+      assert {:error, _} = AcceptLanguage.best_match("fr;q=0,en;q=0")
+    end
+
+    test "ignores out-of-range q values when selecting a match" do
+      assert {:ok, %Localize.LanguageTag{language: :fr}} =
+               AcceptLanguage.best_match("en;q=2,fr;q=1")
     end
 
     test "returns error for completely invalid header" do

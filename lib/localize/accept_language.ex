@@ -31,7 +31,11 @@ defmodule Localize.AcceptLanguage do
     |> String.replace(~r/\s/, "")
     |> String.split(",", trim: true)
     |> Enum.map(&parse_tag/1)
-    |> Enum.reject(fn {_quality, tag} -> tag == "*" end)
+    |> Enum.reject(fn
+      :invalid -> true
+      {_quality, "*"} -> true
+      {_quality, _tag} -> false
+    end)
     |> Enum.sort_by(fn {quality, _tag} -> quality end, :desc)
   end
 
@@ -128,8 +132,8 @@ defmodule Localize.AcceptLanguage do
 
       [tag, quality | _extra] ->
         case Float.parse(quality) do
-          {q, _} -> {q, tag}
-          :error -> {1.0, tag}
+          {q, _rest} when q > 0.0 and q <= 1.0 -> {q, tag}
+          _invalid -> :invalid
         end
     end
   end
