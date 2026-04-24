@@ -42,7 +42,9 @@ defmodule Localize.HTML.Locale do
 
   * `:locales` defines the list of locales to be displayed in the select tag. The default is `Localize.all_locale_ids/0` with meta locales excluded.
 
-  * `:locale` defines the locale used to localise the display names. The default is the locale returned by `Localize.get_locale/0`. If set to `:identity` then each locale in `:locales` will be rendered in its own locale.
+  * `:locale` may be set to `:identity` to render each locale in `:locales`
+    in its own locale. Otherwise display names are rendered in the current
+    process locale returned by `Localize.get_locale/0`.
 
   * `:collator` is a function used to sort the locales. The default collator sorts by display name.
 
