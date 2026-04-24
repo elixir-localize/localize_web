@@ -10,7 +10,7 @@ defmodule LocalizeWeb.MixProject do
       elixir: "~> 1.17",
       name: "Localize Web",
       description: description(),
-      source_url: "https://github.com/kipcole9/localize_web",
+      source_url: "https://github.com/elixir-localize/localize_web",
       package: package(),
       docs: docs(),
       start_permanent: Mix.env() == :prod,
