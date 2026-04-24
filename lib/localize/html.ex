@@ -14,6 +14,8 @@ defmodule Localize.HTML do
 
   * `unit_select/3` and `unit_options/1` — see `Localize.HTML.Unit`.
 
+  * `month_select/3` and `month_options/1` — see `Localize.HTML.Month`.
+
   """
 
   defdelegate currency_select(form, field, options), to: Localize.HTML.Currency, as: :select
@@ -27,4 +29,7 @@ defmodule Localize.HTML do
 
   defdelegate locale_select(form, field, options), to: Localize.HTML.Locale, as: :select
   defdelegate locale_options(options), to: Localize.HTML.Locale, as: :locale_options
+
+  defdelegate month_select(form, field, options), to: Localize.HTML.Month, as: :select
+  defdelegate month_options(options), to: Localize.HTML.Month, as: :month_options
 end
