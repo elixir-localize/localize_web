@@ -26,9 +26,12 @@ defmodule Localize.Plug.PutLocale do
 
     * `:body` will look for a locale by examining `conn.body_params`.
 
-    * `:cookie` will look for a locale in the request cookie(s).
+    * `:cookie` will look for a locale in the request cookie(s). Cookies must
+      be fetched before this plug runs. In Phoenix browser pipelines,
+      `fetch_session/1` fetches cookies as part of loading the session.
 
-    * `:session` will look for a locale in the session.
+    * `:session` will look for a locale in the session. `fetch_session/1` must
+      run before this plug when `:session` is used.
 
     * `:route` will look for a locale in the route that was matched under the key `private.#{inspect(@private_key)}`.
 
