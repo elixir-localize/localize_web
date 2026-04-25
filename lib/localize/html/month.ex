@@ -34,7 +34,7 @@ defmodule Localize.HTML.Month do
 
   * `:months` defines the list of month numbers to be displayed. The default is `1..12`.
 
-  * `:calendar` is the calendar from which the month names are derived. The default is `Calendar.ISO`.
+  * `:calendar` is the calendar module from which the month names are derived. The default is `Calendar.ISO`, which renders Gregorian labels. If the calendar module exports `cldr_calendar_type/0`, the returned atom selects the CLDR calendar used for the labels (for example, `Cldr.Calendar.Hebrew` returns `:hebrew`). Calendars without that function fall back to Gregorian labels.
 
   * `:year` is the year from which the number of months is derived. The default is the current year.
 
