@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-04-25
+
+### Bug Fixes
+
+* Ignore out-of-range and zero-weight q-values when parsing `accept-language` headers per RFC 9110. Thanks to @rubas for the PR. Closes #6.
+
+* Expose `month_select/3` and `month_options/1` on the `Localize.HTML` facade as documented in the moduledoc. Thanks to @rubas for the PR. Closes #9.
+
+* Honor the `:calendar` option in `Localize.HTML.Month` by sourcing month labels from the CLDR calendar returned by the calendar module's `cldr_calendar_type/0` function. Thanks to @rubas for the PR. Closes #10.
+
+### Changes
+
+* Document that `fetch_session/1` must run before `Localize.Plug.PutLocale` when `:session` or `:cookie` sources are used. Thanks to @rubas for the PR. Closes #7.
+
 ## [0.5.0] - 2026-04-17
 
 ### Bug Fixes
