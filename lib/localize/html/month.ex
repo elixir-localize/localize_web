@@ -9,7 +9,7 @@ defmodule Localize.HTML.Month do
   @type select_options :: [
           {:months, [pos_integer(), ...]}
           | {:locale, Localize.locale() | Localize.LanguageTag.t()}
-          | {:calendar, module()}
+          | {:calendar, Calendar.calendar()}
           | {:year, Calendar.year()}
           | {:style, :wide | :abbreviated | :narrow}
           | {:collator, function()}
@@ -129,6 +129,7 @@ defmodule Localize.HTML.Month do
     style = Map.fetch!(options, :style)
     collator = Map.fetch!(options, :collator)
     mapper = Map.fetch!(options, :mapper)
+    calendar = Map.fetch!(options, :calendar)
 
     locale_id =
       case locale do
@@ -136,7 +137,7 @@ defmodule Localize.HTML.Month do
         other -> other
       end
 
-    month_names = get_month_names(locale_id, style)
+    month_names = get_month_names(locale_id, style, calendar)
 
     months
     |> Enum.map(fn month_number ->
@@ -147,13 +148,14 @@ defmodule Localize.HTML.Month do
     |> Enum.map(&mapper.(&1))
   end
 
-  defp get_month_names(locale_id, style) do
+  defp get_month_names(locale_id, style, calendar) do
     calendar_key = calendar_style_key(style)
+    calendar_type = calendar_type(calendar)
 
     case Localize.Locale.get(locale_id, [
            :dates,
            :calendars,
-           :gregorian,
+           calendar_type,
            :months,
            :format,
            calendar_key
@@ -165,6 +167,16 @@ defmodule Localize.HTML.Month do
         Enum.into(1..12, %{}, fn n -> {n, "Month #{n}"} end)
     end
   end
+
+  defp calendar_type(calendar) when is_atom(calendar) do
+    cond do
+      calendar == Calendar.ISO -> :gregorian
+      function_exported?(calendar, :cldr_calendar_type, 0) -> calendar.cldr_calendar_type()
+      true -> :gregorian
+    end
+  end
+
+  defp calendar_type(_calendar), do: :gregorian
 
   defp calendar_style_key(:wide), do: :wide
   defp calendar_style_key(:abbreviated), do: :abbreviated
