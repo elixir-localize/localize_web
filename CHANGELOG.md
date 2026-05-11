@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-11
+
+### Enhancements
+
+* Add `path_for/2` and `url_for/2` macros to `Localize.VerifiedRoutes` to render a verified path or URL in an explicit locale without changing the process-wide locale, supporting language-switcher and hreflang use cases that need every configured locale rendered in one template pass.
+
 ## [0.5.1] - 2026-04-25
 
 ### Bug Fixes

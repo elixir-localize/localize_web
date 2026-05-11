@@ -257,6 +257,41 @@ The `~q` sigil supports the same locale interpolations as the `localize` macro:
 # Produces "/fr/pages_fr/intro" when the locale is :fr
 ```
 
+### Rendering a Path or URL in a Specific Locale
+
+`~q` dispatches on the *current* process locale (`Localize.get_locale/0`). When you need to render a link in a different locale at the call site — without changing the process locale — use `path_for/2` and `url_for/2`. Typical use cases are language switchers and emitting hreflang links per locale in one template pass.
+
+```elixir
+<.link navigate={path_for(:fr, "/users")}>Français</.link>
+<.link navigate={path_for(:de, "/users")}>Deutsch</.link>
+```
+
+The locale argument can also be a runtime expression, which is the more common form when the locale list is iterated:
+
+```elixir
+<%= for locale <- [:en, :fr, :de] do %>
+  <.link navigate={path_for(locale, "/users")}><%= locale %></.link>
+<% end %>
+```
+
+`url_for/2` returns a full URL via `Phoenix.VerifiedRoutes.url/1`:
+
+```elixir
+url_for(:fr, "/users")
+#=> "http://localhost:4000/users_fr"
+```
+
+The route argument accepts the same form as `~q` — a string literal with optional `#{...}` interpolations and `:locale` / `:language` / `:territory` substitutions.
+
+For ad-hoc blocks where you need a whole region of code to run under a specific locale (perhaps because you also want locale-sensitive number or date formatting), `Localize.with_locale/2` temporarily switches the locale and restores it afterwards:
+
+```elixir
+Localize.with_locale(:fr, fn -> ~q"/users" end)
+#=> "/users_fr"
+```
+
+Use `path_for/2` for single-call locale forcing; use `Localize.with_locale/2` for whole-block temporary locale changes.
+
 ## Inspecting Localized Routes
 
 Localized routes are stored in a `LocalizedRoutes` submodule. You can inspect them with the `phx.routes` mix task:

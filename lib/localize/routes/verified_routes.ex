@@ -28,6 +28,25 @@ defmodule Localize.VerifiedRoutes do
 
   * `:territory` is replaced with the CLDR territory code.
 
+  ### Rendering a path or URL in a specific locale
+
+  `sigil_q` dispatches on the *current* process locale set by
+  `Localize.put_locale/1`. When you need to render a link in a different
+  locale without changing the process locale — for example, emitting a
+  language switcher that lists the same page in every configured locale —
+  use `path_for/2` and `url_for/2`:
+
+      # In a template, with @locale bound from the request or session:
+      <.link href={path_for(@locale, "/users")}>Users</.link>
+
+      # Render every configured locale in one pass (language switcher):
+      for locale <- [:en, :fr, :de] do
+        path_for(locale, "/users")
+      end
+
+      url_for(:fr, "/users")
+      #=> "http://localhost/users_fr"
+
   """
 
   defmacro __using__(opts) do
@@ -121,6 +140,96 @@ defmodule Localize.VerifiedRoutes do
         unquote(route)
       )
     end
+  end
+
+  @doc ~S'''
+  Generates a localized verified path in a specific locale.
+
+  Unlike `sigil_q/2`, which dispatches on the *current* locale
+  (`Localize.get_locale/0`), `path_for/2` lets the caller force a particular
+  locale at the call site without changing the process-wide locale. This is
+  useful when rendering links in multiple locales within a single template
+  (for example, a language switcher).
+
+  ### Arguments
+
+  * `locale` is any locale id configured in the gettext backend. May be a
+    literal atom or a runtime expression.
+
+  * `route` is a string literal route (with optional `#{...}` interpolations),
+    as accepted by `sigil_q/2`.
+
+  ### Examples
+
+      path_for(:fr, "/users")
+      #=> "/utilisateurs"
+
+      for locale <- [:en, :fr] do
+        {locale, path_for(locale, "/users")}
+      end
+      #=> [en: "/users", fr: "/utilisateurs"]
+
+  '''
+  defmacro path_for(locale, route) do
+    gettext = Module.get_attribute(__CALLER__.module, :_localize_gettext_backend)
+    locale_ids = Localize.Routes.locales_from_gettext(gettext)
+    route_ast = Localize.VerifiedRoutes.normalize_route_ast(route)
+
+    case_clauses =
+      Localize.VerifiedRoutes.sigil_q_case_clauses(route_ast, [], locale_ids, gettext)
+
+    quote location: :keep do
+      case unquote(locale) do
+        unquote(case_clauses)
+      end
+    end
+  end
+
+  @doc ~S'''
+  Generates a localized verified URL in a specific locale.
+
+  Like `path_for/2` but returns a full URL via `Phoenix.VerifiedRoutes.url/1`.
+
+  ### Arguments
+
+  * `locale` is any locale id configured in the gettext backend.
+
+  * `route` is a string literal route accepted by `sigil_q/2`.
+
+  '''
+  defmacro url_for(locale, route) do
+    gettext = Module.get_attribute(__CALLER__.module, :_localize_gettext_backend)
+    locale_ids = Localize.Routes.locales_from_gettext(gettext)
+    route_ast = Localize.VerifiedRoutes.normalize_route_ast(route)
+
+    case_clauses =
+      Localize.VerifiedRoutes.sigil_q_case_clauses(route_ast, [], locale_ids, gettext)
+
+    case_expr =
+      quote location: :keep do
+        case unquote(locale) do
+          unquote(case_clauses)
+        end
+      end
+
+    wrap_sigil_p_in_url(case_expr)
+  end
+
+  @doc false
+  # Normalises the second arg of `path_for/2`/`url_for/2`. Accepts either a
+  # plain string literal (passed straight through the macro as a binary) or
+  # an interpolated-string AST (`{:<<>>, _, _}`) and returns the AST shape
+  # expected by `sigil_q_case_clauses/4`.
+  def normalize_route_ast(route) when is_binary(route) do
+    {:<<>>, [], [route]}
+  end
+
+  def normalize_route_ast({:<<>>, _, _} = ast), do: ast
+
+  def normalize_route_ast(other) do
+    raise ArgumentError,
+          "path_for/2 and url_for/2 expect a string literal route " <>
+            "(optionally with \#{...} interpolations); got: #{Macro.to_string(other)}"
   end
 
   @doc false
