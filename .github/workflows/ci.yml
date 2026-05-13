@@ -79,9 +79,6 @@ jobs:
       - name: Compile (warnings as errors)
         run: mix compile --warnings-as-errors
 
-      - name: Download required locales for tests
-        run: mix localize.download_locales de ja
-
       - name: Run tests
         run: mix test
 

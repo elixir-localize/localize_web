@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.HTML.t/1` and `t/2` — new compile-time macros for HEEx templates that combine Gettext extraction, MF2 binding interpolation, and markup rendering in one call: `{t("Read {#bold}terms{/bold}")}`. Elixir `#{@user.name}` interpolations have the `assigns` prefix stripped so derived binding names match what a developer would write (`@user.name` → `user_name`).
 
+### Test infrastructure
+
+* `mix test` now runs `mix localize.download_locales` first, populating CLDR data for the locales referenced by the suite (`en`, `fr`, `de`, `th`, `ja`, `ar`, `zh`, `zh-Hans`, `zh-Hant`). Fresh checkouts and CI no longer fail on missing locale display data.
+
 ## [0.6.0] - 2026-05-11
 
 ### Enhancements

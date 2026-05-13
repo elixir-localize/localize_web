@@ -15,6 +15,7 @@ defmodule LocalizeWeb.MixProject do
       docs: docs(),
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
+      aliases: aliases(),
       deps: deps(),
       dialyzer: [
         plt_add_apps: ~w(gettext phoenix phoenix_live_view phoenix_html)a
@@ -138,4 +139,14 @@ defmodule LocalizeWeb.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(:dev), do: ["lib"]
   defp elixirc_paths(_), do: ["lib"]
+
+  # Ensure CLDR locale data for the locales referenced in tests is
+  # present before the suite runs. The download is a no-op when the
+  # cache is already populated, so the alias is cheap on warm
+  # developer machines.
+  defp aliases do
+    [
+      test: ["localize.download_locales", "test"]
+    ]
+  end
 end
