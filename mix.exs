@@ -101,7 +101,7 @@ defmodule LocalizeWeb.MixProject do
 
   defp deps do
     [
-      {:localize, localize_dep_spec()},
+      {:localize, "~> 0.33"},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},
       {:phoenix, "~> 1.7", optional: true},
@@ -112,20 +112,6 @@ defmodule LocalizeWeb.MixProject do
       {:ex_doc, "~> 0.34", only: [:dev, :release], runtime: false},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false}
     ] ++ maybe_json_polyfill()
-  end
-
-  # In a sibling checkout, develop against the local copy of `localize`
-  # so unreleased APIs (e.g. `Localize.Message.Sigils.t/1` helpers) are
-  # available. Falls back to the published version for users without
-  # the sibling checkout.
-  defp localize_dep_spec do
-    sibling = Path.expand("../localize", __DIR__)
-
-    if File.dir?(sibling) do
-      [path: sibling, override: true]
-    else
-      "~> 0.33"
-    end
   end
 
   defp maybe_json_polyfill do
