@@ -16,7 +16,13 @@ defmodule Localize.HTML do
 
   * `month_select/3` and `month_options/1` — see `Localize.HTML.Month`.
 
+  * `message/1` — renders an MF2 message with inline markup, see `Localize.HTML.Message`.
+
   """
+
+  if Code.ensure_loaded?(Phoenix.Component) do
+    defdelegate message(assigns), to: Localize.HTML.Message
+  end
 
   defdelegate currency_select(form, field, options), to: Localize.HTML.Currency, as: :select
   defdelegate currency_options(options), to: Localize.HTML.Currency, as: :currency_options

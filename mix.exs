@@ -54,13 +54,15 @@ defmodule LocalizeWeb.MixProject do
         "CHANGELOG.md",
         "guides/http-locale-discovery.md",
         "guides/phoenix-localized-routing.md",
-        "guides/localized-html-helpers.md"
+        "guides/localized-html-helpers.md",
+        "guides/mf2-messages-in-heex.md"
       ],
       groups_for_extras: [
         Guides: [
           "guides/http-locale-discovery.md",
           "guides/phoenix-localized-routing.md",
-          "guides/localized-html-helpers.md"
+          "guides/localized-html-helpers.md",
+          "guides/mf2-messages-in-heex.md"
         ]
       ],
       groups_for_modules: [
@@ -82,7 +84,8 @@ defmodule LocalizeWeb.MixProject do
           Localize.HTML.Territory,
           Localize.HTML.Locale,
           Localize.HTML.Unit,
-          Localize.HTML.Month
+          Localize.HTML.Month,
+          Localize.HTML.Message
         ]
       ],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md", "Localize.AcceptLanguage"]

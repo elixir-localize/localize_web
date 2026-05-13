@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - Unreleased
+
+### Enhancements
+
+* `Localize.HTML.Message` — new function component (and `Localize.HTML.message/1` facade) that renders an MF2 message preserving inline markup. The `link` default renderer uses Phoenix's `<.link>` and so accepts `href`, `navigate`, or `patch` MF2 attributes; per-call `:components` and `config :localize_web, :mf2_markup, components: %{…}` override the defaults, and unknown tags raise `Localize.HTML.Message.UnknownMarkupError`.
+
 ## [0.6.0] - 2026-05-11
 
 ### Enhancements
