@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - Unreleased
+## [0.7.0] — 2026-05-13
 
 ### Enhancements
 
@@ -14,13 +14,13 @@ All notable changes to this project will be documented in this file. This projec
 
 * `mix test` now runs `mix localize.download_locales` first, populating CLDR data for the locales referenced by the suite (`en`, `fr`, `de`, `th`, `ja`, `ar`, `zh`, `zh-Hans`, `zh-Hant`). Fresh checkouts and CI no longer fail on missing locale display data.
 
-## [0.6.0] - 2026-05-11
+## [0.6.0] — 2026-05-11
 
 ### Enhancements
 
 * Add `path_for/2` and `url_for/2` macros to `Localize.VerifiedRoutes` to render a verified path or URL in an explicit locale without changing the process-wide locale, supporting language-switcher and hreflang use cases that need every configured locale rendered in one template pass.
 
-## [0.5.1] - 2026-04-25
+## [0.5.1] — 2026-04-25
 
 ### Bug Fixes
 
@@ -34,31 +34,31 @@ All notable changes to this project will be documented in this file. This projec
 
 * Document that `fetch_session/1` must run before `Localize.Plug.PutLocale` when `:session` or `:cookie` sources are used. Thanks to @rubas for the PR. Closes #7.
 
-## [0.5.0] - 2026-04-17
+## [0.5.0] — 2026-04-17
 
 ### Bug Fixes
 
 * Be more lenient when parsing invalid `accept-language` headers. Duplicate `q=` might be invalid syntax but they shouldn't crash the parser. Thanks to @woylie for the report. Closes #3.
 
-## [0.4.0] - 2026-04-16
+## [0.4.0] — 2026-04-16
 
 ### Changes
 
 * Don't call `Localize.default_locale/0` at compile time. That causes `localize` to be loaded at compile time which causes issues on machines with constrained resources. Defer the call to runtime.
 
-## [0.3.0] - 2026-04-16
+## [0.3.0] — 2026-04-16
 
 ### Changes
 
 * Make `phoenix_html_helpers` a required dependency (it was optional).
 
-## [0.2.0] - 2026-04-15
+## [0.2.0] — 2026-04-15
 
 ### Changes
 
 * Fix docs links in the package.
 
-## [0.1.0] - 2026-04-13
+## [0.1.0] — 2026-04-13
 
 ### Highlights
 
