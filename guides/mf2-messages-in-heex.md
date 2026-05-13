@@ -1,12 +1,14 @@
 # MF2 Messages in HEEx
 
-This guide covers writing ICU MessageFormat 2 (MF2) messages in Phoenix templates using two complementary tools:
+This guide covers writing ICU MessageFormat 2 (MF2) messages in Phoenix templates. Three tools are available, in increasing order of HEEx-specificity:
 
-* The `~t` sigil from `Localize.Message.Sigils` — for plain-text translations with compile-time gettext extraction.
+* `~t` sigil from `Localize.Message.Sigils` — compile-time MF2 translation that returns a `String.t()`. Best when you only need plain text (no markup). Usable anywhere in Elixir code, not just templates.
 
-* The `Localize.HTML.message/1` function component — for translations that contain inline markup like `{#bold}…{/bold}` or `{#link href=…}…{/link}`.
+* `Localize.HTML.t/1` macro — the **recommended** form for HEEx templates. Combines Gettext extraction, MF2 interpolation, and markup rendering in one call: `{t("...")}`. Supports inline markup such as `{#bold}…{/bold}` or `{#link navigate=…}…{/link}`.
 
-Both rely on a Gettext backend configured with `Localize.Gettext.Interpolation` so that translated strings are evaluated as MF2 at runtime.
+* `Localize.HTML.message/1` function component — for cases where the MF2 source is dynamic (loaded from a database, etc.). Accepts a runtime `:msgid` attribute and `:bindings` map.
+
+All three rely on a Gettext backend configured with `Localize.Gettext.Interpolation`.
 
 ## Setup
 
@@ -22,7 +24,7 @@ end
 
 Without `Localize.Gettext.Interpolation`, MF2 placeholders like `{$name}` are returned literally because Gettext's default interpolation only recognises the `%{name}` form.
 
-### 2. Opt the calling module into `~t`
+### 2. Opt the calling module into `~t` and `t/1`
 
 In a Phoenix app, the most common spot is the HTML helpers macro in `MyAppWeb`:
 
@@ -40,7 +42,7 @@ defmodule MyAppWeb do
 end
 ```
 
-Every LiveView, component, and HTML module that does `use MyAppWeb, :html` now has `~t` and `<.message>` available.
+Every LiveView, component, and HTML module that does `use MyAppWeb, :html` now has `~t`, the `t/1` macro, and `<.message>` available.
 
 `use Localize.Message.Sigils` accepts:
 
@@ -129,7 +131,53 @@ msgstr ".input {$count :number}\n.match $count\n0 {{Aucun élément}}\n1 {{Un é
 
 The MF2 evaluator runs the translated string with the bindings supplied at the call site, so pluralisation rules can change per locale without code changes.
 
-## The `<.message>` component — translations with markup
+## The `t/1` macro — translations with markup (recommended)
+
+The `Localize.HTML.t/1` macro is the most ergonomic way to write translations in HEEx. It combines compile-time Gettext extraction, MF2 interpolation, and markup rendering in one call:
+
+```heex
+<h1>{t("Hello, #{@user.name}!")}</h1>
+<p>{t("By signing up you accept our {#link navigate=|/terms|}terms{/link}.")}</p>
+<p>{t("Read {#bold}#{@count} item(s){/bold}")}</p>
+```
+
+At compile time, the macro:
+
+1. Walks Elixir `#{expr}` interpolations and derives flat MF2 binding names (same rules as `~t`).
+2. Rewrites the message as canonical MF2 source with `{$name}` placeholders.
+3. Emits a `Gettext.Macros.dpgettext_with_backend/5` call so `mix gettext.extract` picks up the msgid.
+
+At runtime:
+
+1. The Gettext lookup returns the translated MF2 source **without** stripping markup (via an internal sentinel that bypasses the markup-stripping interpolation path).
+2. The translated source is walked via `Localize.Message.format_to_safe_list/3`.
+3. Each markup node is dispatched to a registered component (defaults documented under `<.message>` below).
+
+### Differences from `~t`
+
+| Feature                 | `~t`              | `t/1`                              |
+| ----------------------- | ----------------- | ---------------------------------- |
+| Returns                 | `String.t()`      | `Phoenix.HTML.safe()`              |
+| Use site                | Anywhere          | HEEx `{...}` interpolation         |
+| MF2 markup              | Stripped          | Rendered as HEEx via the registry  |
+| Bindings from `@assign` | Yes (compile-time AST walk) | Yes (HEEx rewrites `@x` to `assigns.x` before the macro sees it, and the `assigns` prefix is stripped from the derived binding name) |
+
+Use `~t` when you need a plain string outside of HEEx, e.g. for error messages, page titles assigned to other variables, etc. Use `t/1` everywhere else inside templates.
+
+### Options
+
+`t/2` accepts a keyword-list second argument:
+
+```heex
+{t("Hello, #{@name}!", locale: :fr)}
+{t("Click {#link navigate=|/x|}here{/link}", components: %{"link" => &my_link/1})}
+```
+
+* `:locale` overrides `Localize.get_locale/0` for this render only.
+
+* `:components` is a per-call markup component override (same shape as `<.message>`'s).
+
+## The `<.message>` component — for dynamic msgids
 
 MF2 supports inline markup tags. Examples:
 
@@ -243,17 +291,13 @@ config :localize_web, :mf2_markup,
 
 If a translator writes `{#weird}…{/weird}` and `weird` isn't registered, the component raises `Localize.HTML.Message.UnknownMarkupError` listing the tag and the registered tag names. This is intentional — silent fallbacks hide translator mistakes.
 
-## Choosing between `~t` and `<.message>`
+## Choosing between `~t`, `t/1`, and `<.message>`
 
-* **Plain text, no inline markup** → use `~t`. Returns a `String.t()` you can put inside any HEEx expression: `<h1>{~t"…"}</h1>`.
+* **Inside HEEx templates** → use `t/1`. It handles both plain text and inline markup, extracts to `.po`, and renders markup correctly.
 
-* **Translation contains inline markup** → use `<.message>` with a `msgid` produced by `~t` (so the message still extracts to `.po`):
+* **Outside HEEx** (error messages, dynamic strings, anywhere that needs a `String.t()`) → use `~t`. Note that markup is stripped — `~t` is text-only.
 
-  ```heex
-  <Localize.HTML.message msgid={~t"Read {#bold}carefully{/bold} please"} />
-  ```
-
-* **MF2 message without gettext** (e.g. user-controlled content, or a string from a database) → call `<.message msgid={…} bindings={…} />` directly, bypassing `~t`.
+* **MF2 source loaded at runtime** (from a database, user content, etc.) → use `<.message msgid={...} bindings={...} />`. Bypasses Gettext extraction (the msgid isn't a literal) but supports the same markup-rendering pipeline.
 
 ## A complete example
 
@@ -264,16 +308,14 @@ defmodule MyAppWeb.TermsLive do
   def render(assigns) do
     ~H"""
     <header>
-      <h1>{~t"Welcome, #{@user.name}"}</h1>
+      <h1>{t("Welcome, #{@user.name}")}</h1>
     </header>
 
     <section>
-      <Localize.HTML.message
-        msgid={~t"By signing up you accept our {#link href=|/terms|}terms{/link} and {#link href=|/privacy|}privacy policy{/link}."}
-      />
+      <p>{t("By signing up you accept our {#link navigate=|/terms|}terms{/link} and {#link navigate=|/privacy|}privacy policy{/link}.")}</p>
     </section>
 
-    <p>{~t"You have #{count = @notification_count} new notification(s)"}</p>
+    <p>{t("You have #{count = @notification_count} new notification(s)")}</p>
     """
   end
 end

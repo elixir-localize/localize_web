@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.HTML.Message` — new function component (and `Localize.HTML.message/1` facade) that renders an MF2 message preserving inline markup. The `link` default renderer uses Phoenix's `<.link>` and so accepts `href`, `navigate`, or `patch` MF2 attributes; per-call `:components` and `config :localize_web, :mf2_markup, components: %{…}` override the defaults, and unknown tags raise `Localize.HTML.Message.UnknownMarkupError`.
 
+* `Localize.HTML.t/1` and `t/2` — new compile-time macros for HEEx templates that combine Gettext extraction, MF2 binding interpolation, and markup rendering in one call: `{t("Read {#bold}terms{/bold}")}`. Elixir `#{@user.name}` interpolations have the `assigns` prefix stripped so derived binding names match what a developer would write (`@user.name` → `user_name`).
+
 ## [0.6.0] - 2026-05-11
 
 ### Enhancements
