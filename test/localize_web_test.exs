@@ -59,4 +59,11 @@ defmodule LocalizeWebTest do
     {:ok, tag} = Localize.validate_locale(:en)
     assert is_binary(Phoenix.HTML.Safe.to_iodata(tag))
   end
+
+  if Code.ensure_loaded?(Localize.PhoneNumber.Number) do
+    test "Phoenix.HTML.Safe protocol for Localize.PhoneNumber.Number renders the international format" do
+      {:ok, number} = Localize.PhoneNumber.parse("+1 650-253-0000")
+      assert IO.iodata_to_binary(Phoenix.HTML.Safe.to_iodata(number)) == "+1 650-253-0000"
+    end
+  end
 end

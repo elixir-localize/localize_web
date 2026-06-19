@@ -104,6 +104,7 @@ defmodule LocalizeWeb.MixProject do
       {:localize, "~> 0.33"},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},
+      {:localize_phone_number, "~> 0.1", optional: true},
       {:phoenix, "~> 1.7", optional: true},
       {:phoenix_html, "~> 4.0"},
       {:phoenix_html_helpers, "~> 1.0"},
