@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-06-25
+
+### Bug Fixes
+
+* `Localize.Plug.PutSession` no longer rewrites the session (and emits a redundant `Set-Cookie`) when the stored locale is unchanged, avoiding needless response bandwidth and preventing caching layers from treating responses as private. Ported from `ex_cldr_plugs` with thanks @maltoe.
+
 ## [0.7.0] — 2026-05-13
 
 ### Enhancements

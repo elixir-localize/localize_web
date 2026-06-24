@@ -64,7 +64,11 @@ defmodule Localize.Plug.PutSession do
             locale
           end
 
-        put_session(conn, PutLocale.session_key(), stored_locale)
+        if get_session(conn, PutLocale.session_key()) != stored_locale do
+          put_session(conn, PutLocale.session_key(), stored_locale)
+        else
+          conn
+        end
 
       _other ->
         conn

@@ -109,6 +109,40 @@ defmodule Localize.Plug.PutSessionTest do
     end
   end
 
+  describe "call/2 - avoids needless session writes" do
+    test "does not rewrite the session when the stored locale is unchanged" do
+      session_options = PutSession.init(as: :string)
+      put_locale_options = PutLocale.init(from: [:query], apps: [:localize])
+
+      # First request: the locale is written to the session, so a session
+      # cookie is set on the response.
+      conn1 =
+        "fr"
+        |> session_conn()
+        |> PutSession.call(session_options)
+        |> send_resp(200, "")
+
+      assert conn1.resp_cookies != %{}
+      assert get_session(conn1, "localize_locale") =~ "fr"
+
+      # Second request carrying that cookie and resolving to the same locale.
+      conn2 =
+        :get
+        |> conn("/?locale=fr")
+        |> recycle_cookies(conn1)
+        |> put_in([Access.key(:secret_key_base)], String.duplicate("X", 64))
+        |> Plug.Session.call(@session_options)
+        |> fetch_session()
+        |> PutLocale.call(put_locale_options)
+        |> PutSession.call(session_options)
+        |> send_resp(200, "")
+
+      # The session already holds this locale, so no Set-Cookie is emitted.
+      assert conn2.resp_cookies == %{}
+      assert get_session(conn2, "localize_locale") =~ "fr"
+    end
+  end
+
   describe "session key" do
     test "uses the standard session key" do
       assert PutLocale.session_key() == "localize_locale"
