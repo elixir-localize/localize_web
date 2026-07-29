@@ -1,7 +1,7 @@
 defmodule LocalizeWeb.MixProject do
   use Mix.Project
 
-  @version "0.8.0"
+  @version "1.0.0-rc.0"
 
   def project do
     [
@@ -101,7 +101,7 @@ defmodule LocalizeWeb.MixProject do
 
   defp deps do
     [
-      {:localize, "~> 0.33"},
+      {:localize, "~> 1.0-rc"},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},
       {:phoenix, "~> 1.7", optional: true},
