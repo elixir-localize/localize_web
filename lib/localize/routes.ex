@@ -102,10 +102,15 @@ defmodule Localize.Routes do
       Localize.Routes.delete_original_path(routes)
     )
 
+    # `Phoenix.Router.Route.exprs/1` gained a second argument in later
+    # Phoenix releases. `apply/3` is what lets one build support both
+    # arities — a direct call to the absent one would not compile.
     routes_with_exprs =
       if function_exported?(Phoenix.Router.Route, :exprs, 2) do
+        # credo:disable-for-next-line Credo.Check.Refactor.Apply
         Enum.map(routes, &{&1, apply(Phoenix.Router.Route, :exprs, [&1, forwards])})
       else
+        # credo:disable-for-next-line Credo.Check.Refactor.Apply
         Enum.map(routes, &{&1, apply(Phoenix.Router.Route, :exprs, [&1])})
       end
 
@@ -202,24 +207,8 @@ defmodule Localize.Routes do
   defmacro localize(locale_ids, do: route) when is_list(locale_ids) do
     gettext_backend = Module.get_attribute(__CALLER__.module, :_gettext_backend)
 
-    for locale_id <- locale_ids do
-      with {:ok, locale} <- Localize.validate_locale(locale_id) do
-        case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
-          {:ok, gettext_locale} ->
-            quote do
-              localize(
-                {unquote(Macro.escape(locale)), unquote(gettext_locale)},
-                unquote(route)
-              )
-            end
-
-          {:error, _reason} ->
-            warn_no_gettext_locale(locale_id, route)
-        end
-      else
-        {:error, %{__exception__: true} = exception} -> raise exception
-      end
-    end
+    locale_ids
+    |> Enum.map(&localized_route(&1, route, gettext_backend))
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq_by(&canonical_route/1)
   end
@@ -279,6 +268,32 @@ defmodule Localize.Routes do
           Invalid route for localization: #{verb} #{inspect(path)}, #{inspect(args)}
           Allowed localizable routes are #{inspect(@localizable_verbs)}
           """
+  end
+
+  # Expands one locale into a `localize/2` call carrying both the
+  # resolved language tag and its Gettext locale. A locale with no
+  # Gettext translations is warned about and skipped; an invalid locale
+  # identifier is a mistake in the router and raises.
+  defp localized_route(locale_id, route, gettext_backend) do
+    case Localize.validate_locale(locale_id) do
+      {:ok, locale} -> gettext_localized_route(locale, locale_id, route, gettext_backend)
+      {:error, exception} -> raise exception
+    end
+  end
+
+  defp gettext_localized_route(locale, locale_id, route, gettext_backend) do
+    case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
+      {:ok, gettext_locale} ->
+        quote do
+          localize(
+            {unquote(Macro.escape(locale)), unquote(gettext_locale)},
+            unquote(route)
+          )
+        end
+
+      {:error, _reason} ->
+        warn_no_gettext_locale(locale_id, route)
+    end
   end
 
   defp do_localize(field, {locale, gettext_locale}, gettext_backend, {verb, meta, [path | args]}) do

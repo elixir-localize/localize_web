@@ -45,8 +45,6 @@ defmodule Localize.HTML.Currency do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
-  * `{:error, {module(), binary()}}` if validation fails.
-
   ### Examples
 
       iex> Localize.HTML.Currency.select(:my_form, :currency, selected: :USD)
@@ -79,12 +77,10 @@ defmodule Localize.HTML.Currency do
 
   ### Returns
 
-  * A list of `{display_name, currency_code}` tuples, or
-
-  * `{:error, {module(), binary()}}` if validation fails.
+  * A list of `{display_name, currency_code}` tuples.
 
   """
-  @spec currency_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
+  @spec currency_options(select_options) :: list(tuple())
 
   def currency_options(options \\ [])
 

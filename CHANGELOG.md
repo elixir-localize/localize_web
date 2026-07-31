@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0-rc.0] — 2026-07-30
+## [1.0.0] — 2026-07-31
+
+The first stable release, built on Localize 1.0.
 
 ### Changes
 
-* Updated `Localize` to `"~> 1.0-rc"`.
+* Requires `localize ~> 1.0`.
+
+### Fixed
+
+* `Localize.HTML.Unit.select/3` is specified as returning `{:error, Exception.t()}`. Localize 1.0 reports an invalid unit or locale as an exception struct rather than a `{module, message}` tuple, so the previous specification did not describe what the function returns.
+
+* `currency_options/1`, `locale_options/1`, `territory_options/1` and `unit_options/1` no longer claim to return an error tuple. They validate by raising, so the documented error return could not occur.
 
 ## [0.8.0] — 2026-06-25
 

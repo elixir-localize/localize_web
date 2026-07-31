@@ -44,7 +44,7 @@ defmodule Localize.Plug.PutSession do
                 "Invalid option for `:as`. Valid settings are :string or :language_tag. Found #{inspect(other)}"
       end
 
-    if length(options) > 0,
+    if options != [],
       do:
         raise(ArgumentError, "Invalid options. Valid option is `:as`. Found #{inspect(options)}")
 

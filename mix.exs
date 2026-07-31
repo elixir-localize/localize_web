@@ -1,7 +1,7 @@
 defmodule LocalizeWeb.MixProject do
   use Mix.Project
 
-  @version "1.0.0-rc.0"
+  @version "1.0.0"
 
   def project do
     [
@@ -18,7 +18,14 @@ defmodule LocalizeWeb.MixProject do
       aliases: aliases(),
       deps: deps(),
       dialyzer: [
-        plt_add_apps: ~w(gettext phoenix phoenix_live_view phoenix_html)a
+        plt_add_apps: ~w(gettext phoenix phoenix_live_view phoenix_html)a,
+        flags: [
+          :error_handling,
+          :unknown,
+          :underspecs,
+          :extra_return,
+          :missing_return
+        ]
       ]
     ]
   end
@@ -101,7 +108,8 @@ defmodule LocalizeWeb.MixProject do
 
   defp deps do
     [
-      {:localize, "~> 1.0-rc"},
+      {:localize, "~> 1.0"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},
       {:phoenix, "~> 1.7", optional: true},

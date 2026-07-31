@@ -1,4 +1,4 @@
-defmodule Sigil_q.Test do
+defmodule SigilQTest do
   use ExUnit.Case
 
   use Localize.VerifiedRoutes,

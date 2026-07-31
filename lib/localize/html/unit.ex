@@ -48,8 +48,6 @@ defmodule Localize.HTML.Unit do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
-  * `{:error, {module(), binary()}}` if validation fails.
-
   ### Examples
 
       iex> Localize.HTML.Unit.select(:my_form, :unit, selected: :foot)
@@ -61,7 +59,7 @@ defmodule Localize.HTML.Unit do
           select_options
         ) ::
           Phoenix.HTML.safe()
-          | {:error, {module(), binary()}}
+          | {:error, Exception.t()}
 
   def select(form, field, options \\ [])
 
@@ -82,12 +80,10 @@ defmodule Localize.HTML.Unit do
 
   ### Returns
 
-  * A list of `{display_name, unit_code}` tuples, or
-
-  * `{:error, {module(), binary()}}` if validation fails.
+  * A list of `{display_name, unit_code}` tuples.
 
   """
-  @spec unit_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
+  @spec unit_options(select_options) :: list(tuple())
 
   def unit_options(options \\ [])
 

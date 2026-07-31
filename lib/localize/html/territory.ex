@@ -58,8 +58,6 @@ defmodule Localize.HTML.Territory do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
-  * `{:error, {module(), binary()}}` if validation fails.
-
   ### Examples
 
       iex> Localize.HTML.Territory.select(:my_form, :territory, selected: :AU)
@@ -92,12 +90,10 @@ defmodule Localize.HTML.Territory do
 
   ### Returns
 
-  * A list of `{display_name, territory_code}` tuples, or
-
-  * `{:error, {module(), binary()}}` if validation fails.
+  * A list of `{display_name, territory_code}` tuples.
 
   """
-  @spec territory_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
+  @spec territory_options(select_options) :: list(tuple())
 
   def territory_options(options \\ [])
 
@@ -221,16 +217,21 @@ defmodule Localize.HTML.Territory do
   end
 
   defp name_from_territory(territory, options) do
-    with {:ok, name} <- Localize.Territory.display_name(territory, options) do
-      name
-    else
-      {:error, _} ->
-        default_options = Keyword.delete(options, :style)
+    case Localize.Territory.display_name(territory, options) do
+      {:ok, name} -> name
+      {:error, _reason} -> name_from_default_style(territory, options)
+    end
+  end
 
-        case Localize.Territory.display_name(territory, default_options) do
-          {:ok, name} -> name
-          _ -> to_string(territory)
-        end
+  # Not every territory has a name in every style, so a failed lookup
+  # retries with the locale's default style before falling back to the
+  # territory code itself.
+  defp name_from_default_style(territory, options) do
+    default_options = Keyword.delete(options, :style)
+
+    case Localize.Territory.display_name(territory, default_options) do
+      {:ok, name} -> name
+      _error -> to_string(territory)
     end
   end
 

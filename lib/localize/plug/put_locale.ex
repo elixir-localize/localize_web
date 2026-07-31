@@ -89,7 +89,9 @@ defmodule Localize.Plug.PutLocale do
 
   @doc false
   def call(conn, options) do
-    if locale = locale_from_params(conn, options[:from], options) || default(conn, options) do
+    locale = locale_from_params(conn, options[:from], options) || default(conn, options)
+
+    if locale do
       Localize.put_locale(locale)
 
       Enum.each(options[:gettext], fn gettext_backend ->

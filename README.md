@@ -27,7 +27,7 @@ Add `localize_web` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:localize_web, "~> 0.1.0"}
+    {:localize_web, "~> 1.0"}
   ]
 end
 ```

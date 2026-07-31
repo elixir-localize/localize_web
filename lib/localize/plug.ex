@@ -54,22 +54,7 @@ defmodule Localize.Plug do
 
     with {:ok, locale} <- Localize.validate_locale(locale) do
       Localize.put_locale(locale)
-
-      Enum.each(gettext_backends, fn gettext_backend ->
-        case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
-          {:ok, gettext_locale} ->
-            Gettext.put_locale(gettext_backend, gettext_locale)
-
-          {:error, _reason} ->
-            require Logger
-
-            Logger.warning(
-              "Localize.Plug.put_locale_from_session/2: locale #{inspect(locale.cldr_locale_id)} " <>
-                "does not have a matching Gettext locale for backend #{inspect(gettext_backend)}. " <>
-                "No Gettext locale has been set."
-            )
-        end
-      end)
+      Enum.each(gettext_backends, &put_gettext_locale(&1, locale))
 
       {:ok, locale}
     end
@@ -77,6 +62,25 @@ defmodule Localize.Plug do
 
   def put_locale_from_session(_session, _options) do
     {:error, {Localize.UnknownLocaleError, "No locale was found in the session"}}
+  end
+
+  # A locale that Gettext has no translations for is a configuration
+  # mismatch rather than an error: the locale is still set for Localize,
+  # and only the Gettext locale is left alone.
+  defp put_gettext_locale(gettext_backend, locale) do
+    case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
+      {:ok, gettext_locale} ->
+        Gettext.put_locale(gettext_backend, gettext_locale)
+
+      {:error, _reason} ->
+        require Logger
+
+        Logger.warning(
+          "Localize.Plug.put_locale_from_session/2: locale #{inspect(locale.cldr_locale_id)} " <>
+            "does not have a matching Gettext locale for backend #{inspect(gettext_backend)}. " <>
+            "No Gettext locale has been set."
+        )
+    end
   end
 
   defp normalize_gettext_backends(nil), do: []

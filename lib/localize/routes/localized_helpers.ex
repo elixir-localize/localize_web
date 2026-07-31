@@ -455,6 +455,7 @@ defmodule Localize.Routes.LocalizedHelpers do
     function_exported?(helper_module, helper, arity)
   end
 
+  @spec invalid_route_error(String.t(), atom(), keyword()) :: no_return()
   defp invalid_route_error(prelude, fun, routes) do
     suggestions =
       for {action, bindings} <- routes do
@@ -466,6 +467,7 @@ defmodule Localize.Routes.LocalizedHelpers do
           "#{prelude}. The following actions/clauses are supported:\n#{suggestions}"
   end
 
+  @spec invalid_param_error(module(), atom(), non_neg_integer(), term(), keyword()) :: no_return()
   defp invalid_param_error(mod, fun, arity, action, routes) do
     call_vars = Keyword.fetch!(routes, action)
 

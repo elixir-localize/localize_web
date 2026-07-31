@@ -56,8 +56,6 @@ defmodule Localize.HTML.Locale do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
-  * `{:error, {module(), binary()}}` if validation fails.
-
   ### Examples
 
       iex> Localize.HTML.Locale.select(:my_form, :locale_list, selected: "en")
@@ -89,12 +87,10 @@ defmodule Localize.HTML.Locale do
 
   ### Returns
 
-  * A list of `{display_name, locale_string}` tuples, or
-
-  * `{:error, {module(), binary()}}` if validation fails.
+  * A list of `{display_name, locale_string}` tuples.
 
   """
-  @spec locale_options(select_options) :: list(tuple()) | {:error, {module(), binary()}}
+  @spec locale_options(select_options) :: list(tuple())
 
   def locale_options(options \\ [])
 
