@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-07-31
+
+### Removed
+
+* The `LocalizeWeb` module. It defined no functions — only a moduledoc listing the plugs, routes and HTML helpers, all of which live under `Localize.*` and are unaffected.
+
 ## [1.0.0] — 2026-07-31
 
 The first stable release, built on Localize 1.0.
