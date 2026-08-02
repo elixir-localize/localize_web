@@ -12,11 +12,11 @@ All notable changes to this project will be documented in this file. This projec
 
 ### Documentation
 
-* Align the documentation module names to the canonical Phoenix generator forms. Thanks to @sumerokr for the PRs. Closes #13, #14.
+* Align the documentation module names to the canonical Phoenix generator forms, and require `~> 1.0` in the installation snippets rather than the long-superseded `~> 0.1.0`. Thanks to @sumerokr for the PRs. Closes #13, #14.
 
 * `Localize.VerifiedRoutes` documents that every option other than `:gettext` passes through to `Phoenix.VerifiedRoutes`, and that `:statics` in particular must be kept when converting from `use Phoenix.VerifiedRoutes` — without it the asset paths in the default Phoenix layouts warn that no route matches ([#16](https://github.com/elixir-localize/localize_web/issues/16)).
 
-* The guides now name web-layer modules `MyAppWeb.*` as Phoenix's generators do, rather than `MyApp.*`, and the installation snippets require `~> 1.0` instead of the long-superseded `~> 0.1.0`. Thanks to @sumerokr for both ([#13](https://github.com/elixir-localize/localize_web/pull/13), [#14](https://github.com/elixir-localize/localize_web/pull/14)), and for the two reports above.
+### Removed
 
 * The `LocalizeWeb` module. It defined no functions — only a moduledoc listing the plugs, routes and HTML helpers, all of which live under `Localize.*` and are unaffected.
 
