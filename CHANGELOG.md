@@ -8,6 +8,12 @@ All notable changes to this project will be documented in this file. This projec
 
 * `~q` now resolves the `#{locale}`, `#{language}` and `#{territory}` interpolation forms, which previously raised `a dynamic ~p interpolation must follow a static segment` at compile time in every position ([#15](https://github.com/elixir-localize/localize_web/issues/15)). Substituting the token left the enclosing `::binary` wrapper in place, so Phoenix saw a literal inside a dynamic segment and matched none of its route-verification clauses.
 
+* `mix phx.routes <Router>.LocalizedRoutes` now works, where it raised `function ... formatted_routes/1 is undefined` ([#16](https://github.com/elixir-localize/localize_web/issues/16)). The generated module hosts route definitions but is not a router, so the `formatted_routes/1` and `__helpers__/0` callbacks `Phoenix.Router.ConsoleFormatter` calls are now defined on it.
+
+### Documentation
+
+* `Localize.VerifiedRoutes` documents that every option other than `:gettext` passes through to `Phoenix.VerifiedRoutes`, and that `:statics` in particular must be kept when converting from `use Phoenix.VerifiedRoutes` — without it the asset paths in the default Phoenix layouts warn that no route matches ([#16](https://github.com/elixir-localize/localize_web/issues/16)).
+
 ### Removed
 
 * The `LocalizeWeb` module. It defined no functions — only a moduledoc listing the plugs, routes and HTML helpers, all of which live under `Localize.*` and are unaffected.

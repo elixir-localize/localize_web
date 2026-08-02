@@ -7,7 +7,14 @@ defmodule Localize.VerifiedRoutes do
       use Localize.VerifiedRoutes,
         router: MyApp.Router,
         endpoint: MyApp.Endpoint,
-        gettext: MyApp.Gettext
+        gettext: MyApp.Gettext,
+        statics: MyAppWeb.static_paths()
+
+  Only `:gettext` is consumed here; every other option is passed through
+  to `Phoenix.VerifiedRoutes` unchanged. Keep whatever the generated
+  `MyAppWeb.verified_routes/0` already passed — in particular `:statics`,
+  without which `~p"/images/logo.svg"` and the other asset paths in the
+  default layouts warn that no route matches them.
 
   When configured, the sigil `~q` is made available to express localized verified routes. Sigil `~p` remains available for non-localized verified routes.
 

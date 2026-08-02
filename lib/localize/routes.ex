@@ -134,6 +134,33 @@ defmodule Localize.Routes do
         def __routes__ do
           unquote(Macro.escape(localized_routes))
         end
+
+        # `mix phx.routes` renders through `Phoenix.Router.ConsoleFormatter`,
+        # which calls `formatted_routes/1` and `__helpers__/0` on whatever
+        # module it is given. This module only hosts route definitions — it
+        # is not a router and gets none of `Phoenix.Router`'s callbacks — so
+        # both are defined here. `__formatted_routes__/1` postdates Phoenix
+        # 1.7, which this library still supports, hence the export check
+        # rather than a direct call that would warn on the older release.
+        def formatted_routes(_options) do
+          # `Code.ensure_loaded?/1` first: `function_exported?/3` answers
+          # false for a module that merely has not been loaded yet, which
+          # would silently fall back to the raw routes — and those lack
+          # the `:label` the formatter expects.
+          if Code.ensure_loaded?(Phoenix.Router) and
+               function_exported?(Phoenix.Router, :__formatted_routes__, 1) do
+            # credo:disable-for-next-line Credo.Check.Refactor.Apply
+            apply(Phoenix.Router, :__formatted_routes__, [__MODULE__])
+          else
+            __routes__()
+          end
+        end
+
+        # Delegated so the helper column matches the router these routes
+        # were generated from.
+        def __helpers__ do
+          unquote(env.module).__helpers__()
+        end
       end
     end
   end
