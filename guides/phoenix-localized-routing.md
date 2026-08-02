@@ -10,7 +10,7 @@ Localized routing requires a Gettext backend. Path segments are translated at co
 # mix.exs
 def deps do
   [
-    {:localize_web, "~> 0.1.0"},
+    {:localize_web, "~> 1.0"},
     {:gettext, "~> 1.0"}
   ]
 end

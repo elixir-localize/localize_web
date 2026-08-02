@@ -10,7 +10,7 @@ Add `localize_web` and a Gettext backend to your project:
 # mix.exs
 def deps do
   [
-    {:localize_web, "~> 0.1.0"},
+    {:localize_web, "~> 1.0"},
     {:gettext, "~> 1.0"}
   ]
 end
