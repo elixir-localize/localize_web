@@ -17,8 +17,8 @@ end
 ```
 
 ```elixir
-# lib/my_app/gettext.ex
-defmodule MyApp.Gettext do
+# lib/my_app_web/gettext.ex
+defmodule MyAppWeb.Gettext do
   use Gettext.Backend, otp_app: :my_app
 end
 ```
@@ -28,20 +28,20 @@ end
 Add `use Localize.Routes` to your router alongside `use Phoenix.Router`:
 
 ```elixir
-defmodule MyApp.Router do
+defmodule MyAppWeb.Router do
   use Phoenix.Router
-  use Localize.Routes, gettext: MyApp.Gettext
+  use Localize.Routes, gettext: MyAppWeb.Gettext
 
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
     plug Localize.Plug.PutLocale,
       from: [:route, :session, :accept_language],
-      gettext: MyApp.Gettext
+      gettext: MyAppWeb.Gettext
     plug Localize.Plug.PutSession
   end
 
-  scope "/", MyApp do
+  scope "/", MyAppWeb do
     pipe_through :browser
 
     localize do
@@ -158,12 +158,12 @@ end
 
 ## Localized Route Helpers
 
-A `LocalizedHelpers` module is generated at compile time. If your router is `MyApp.Router`, the helpers are at `MyApp.Router.LocalizedHelpers`.
+A `LocalizedHelpers` module is generated at compile time. If your router is `MyAppWeb.Router`, the helpers are at `MyAppWeb.Router.LocalizedHelpers`.
 
 The helper functions automatically dispatch to the correct locale-specific route based on the current locale:
 
 ```elixir
-iex> import MyApp.Router.LocalizedHelpers
+iex> import MyAppWeb.Router.LocalizedHelpers
 iex> Localize.put_locale("fr")
 iex> page_path(conn, :show, "intro")
 "/pages_fr/intro"
@@ -178,7 +178,7 @@ The same helper name works for all locales. The current process locale determine
 To disable helper generation:
 
 ```elixir
-use Localize.Routes, gettext: MyApp.Gettext, helpers: false
+use Localize.Routes, gettext: MyAppWeb.Gettext, helpers: false
 ```
 
 ### Static and URL Helpers
@@ -194,10 +194,10 @@ The `LocalizedHelpers` module also delegates to the standard Phoenix helpers:
 The generated helpers include `*_links` functions that produce a map of locale-to-URL pairs. These are used to build `<link rel="alternate" hreflang="...">` tags for SEO:
 
 ```elixir
-iex> url_map = MyApp.Router.LocalizedHelpers.page_links(conn, :show, "intro")
+iex> url_map = MyAppWeb.Router.LocalizedHelpers.page_links(conn, :show, "intro")
 %{"en" => "http://localhost/pages/intro", "fr" => "http://localhost/pages_fr/intro"}
 
-iex> MyApp.Router.LocalizedHelpers.hreflang_links(url_map)
+iex> MyAppWeb.Router.LocalizedHelpers.hreflang_links(url_map)
 {:safe, ...}  # Generates <link href="..." rel="alternate" hreflang="..."/> tags
 ```
 
@@ -212,9 +212,9 @@ For compile-time verified routes, use `Localize.VerifiedRoutes` instead of `Phoe
 defp html_helpers do
   quote do
     use Localize.VerifiedRoutes,
-      router: MyApp.Router,
-      endpoint: MyApp.Endpoint,
-      gettext: MyApp.Gettext
+      router: MyAppWeb.Router,
+      endpoint: MyAppWeb.Endpoint,
+      gettext: MyAppWeb.Gettext
   end
 end
 ```
@@ -307,7 +307,7 @@ Use `path_for/2` for single-call locale forcing; use `Localize.with_locale/2` fo
 Localized routes are stored in a `LocalizedRoutes` submodule. You can inspect them with the `phx.routes` mix task:
 
 ```bash
-mix phx.routes MyApp.Router.LocalizedRoutes
+mix phx.routes MyAppWeb.Router.LocalizedRoutes
 ```
 
 This shows all generated localized routes with their paths, verbs, and controller actions.

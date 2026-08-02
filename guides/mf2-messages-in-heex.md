@@ -15,7 +15,7 @@ All three rely on a Gettext backend configured with `Localize.Gettext.Interpolat
 ### 1. Configure a Gettext backend with MF2 interpolation
 
 ```elixir
-defmodule MyApp.Gettext do
+defmodule MyAppWeb.Gettext do
   use Gettext.Backend,
     otp_app: :my_app,
     interpolation: Localize.Gettext.Interpolation
@@ -35,7 +35,7 @@ defmodule MyAppWeb do
       use Phoenix.Component
       import Localize.HTML
       use Localize.Message.Sigils,
-        backend: MyApp.Gettext,
+        backend: MyAppWeb.Gettext,
         sigils: [domain: "messages"]
     end
   end
@@ -71,7 +71,7 @@ At compile time, `~t"Hello, #{@user.name}!"` expands to roughly:
 
 ```elixir
 Gettext.Macros.dpgettext_with_backend(
-  MyApp.Gettext,
+  MyAppWeb.Gettext,
   "messages",
   nil,
   "Hello, {$user_name}!",
