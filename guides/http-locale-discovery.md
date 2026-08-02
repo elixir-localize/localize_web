@@ -19,8 +19,8 @@ end
 Define a Gettext backend if you don't already have one:
 
 ```elixir
-# lib/my_app/gettext.ex
-defmodule MyApp.Gettext do
+# lib/my_app_web/gettext.ex
+defmodule MyAppWeb.Gettext do
   use Gettext.Backend, otp_app: :my_app
 end
 ```
@@ -28,7 +28,7 @@ end
 As an alternative to standard Gettext interpolation, you can configure the backend to use [ICU MessageFormat 2](https://hexdocs.pm/localize/Localize.Gettext.Interpolation.html) for richer message formatting including plural rules, select expressions, and number/date formatting:
 
 ```elixir
-defmodule MyApp.Gettext do
+defmodule MyAppWeb.Gettext do
   use Gettext.Backend,
     otp_app: :my_app,
     interpolation: Localize.Gettext.Interpolation
@@ -73,7 +73,7 @@ pipeline :browser do
   plug Localize.Plug.PutLocale,
     from: [:session, :accept_language, :query, :path],
     param: "locale",
-    gettext: MyApp.Gettext
+    gettext: MyAppWeb.Gettext
   plug Localize.Plug.PutSession
 end
 ```
@@ -101,10 +101,10 @@ The `:gettext` option accepts a single Gettext backend module or a list of backe
 
 ```elixir
 # Single backend
-plug Localize.Plug.PutLocale, gettext: MyApp.Gettext
+plug Localize.Plug.PutLocale, gettext: MyAppWeb.Gettext
 
 # Multiple backends
-plug Localize.Plug.PutLocale, gettext: [MyApp.Gettext, MyOtherApp.Gettext]
+plug Localize.Plug.PutLocale, gettext: [MyAppWeb.Gettext, MyOtherApp.Gettext]
 ```
 
 When omitted, only the Localize process locale is set and no Gettext locale is configured.
@@ -123,7 +123,7 @@ plug Localize.Plug.PutLocale, default: "en"
 plug Localize.Plug.PutLocale, default: :none
 
 # Use a custom function
-plug Localize.Plug.PutLocale, default: {MyApp.Locale, :resolve_default}
+plug Localize.Plug.PutLocale, default: {MyAppWeb.Locale, :resolve_default}
 ```
 
 ### Avoiding Localize Calls at Compile Time
@@ -136,7 +136,7 @@ The most common pitfall is using `Localize.default_locale/0` as the `:default` o
 # ❌ Calls Localize.default_locale() at COMPILE TIME — loads CLDR data into the compiler VM.
 plug Localize.Plug.PutLocale,
   default: Localize.default_locale(),
-  gettext: MyApp.Gettext
+  gettext: MyAppWeb.Gettext
 ```
 
 Instead, use a static atom or string for the default. The runtime behaviour is identical — `:en` is the default locale unless configured otherwise:
@@ -145,7 +145,7 @@ Instead, use a static atom or string for the default. The runtime behaviour is i
 # ✅ Static value — no Localize code runs at compile time.
 plug Localize.Plug.PutLocale,
   default: :en,
-  gettext: MyApp.Gettext
+  gettext: MyAppWeb.Gettext
 ```
 
 If you need a dynamic default that reads from application config or system environment, use an MFA tuple so evaluation is deferred to runtime (when each request is processed):
@@ -153,12 +153,12 @@ If you need a dynamic default that reads from application config or system envir
 ```elixir
 # ✅ MFA tuple — evaluated at runtime, not compile time.
 plug Localize.Plug.PutLocale,
-  default: {MyApp.Locale, :resolve_default},
-  gettext: MyApp.Gettext
+  default: {MyAppWeb.Locale, :resolve_default},
+  gettext: MyAppWeb.Gettext
 ```
 
 ```elixir
-defmodule MyApp.Locale do
+defmodule MyAppWeb.Locale do
   @doc """
   Returns the default locale at runtime by checking, in order:
 
@@ -215,7 +215,7 @@ Beyond the common sources shown above, `Localize.Plug.PutLocale` supports these 
 ### Custom Locale Resolution Example
 
 ```elixir
-defmodule MyApp.LocaleResolver do
+defmodule MyAppWeb.LocaleResolver do
   def from_user(conn, _options) do
     case conn.assigns[:current_user] do
       %{preferred_locale: locale} when is_binary(locale) ->
@@ -228,8 +228,8 @@ end
 
 # In the router
 plug Localize.Plug.PutLocale,
-  from: [{MyApp.LocaleResolver, :from_user}, :session, :accept_language],
-  gettext: MyApp.Gettext
+  from: [{MyAppWeb.LocaleResolver, :from_user}, :session, :accept_language],
+  gettext: MyAppWeb.Gettext
 ```
 
 ## Persisting Locale in the Session
@@ -258,7 +258,7 @@ defmodule MyAppWeb.LocaleLive do
   def on_mount(:default, _params, session, socket) do
     {:ok, _locale} = Localize.Plug.put_locale_from_session(
       session,
-      gettext: MyApp.Gettext
+      gettext: MyAppWeb.Gettext
     )
     {:cont, socket}
   end
@@ -303,7 +303,7 @@ pipeline :browser do
   plug :put_secure_browser_headers
   plug Localize.Plug.PutLocale,
     from: [:route, :session, :accept_language],
-    gettext: MyApp.Gettext
+    gettext: MyAppWeb.Gettext
   plug Localize.Plug.PutSession
 end
 ```
