@@ -6,15 +6,17 @@ All notable changes to this project will be documented in this file. This projec
 
 ### Fixed
 
-* `~q` now resolves the `#{locale}`, `#{language}` and `#{territory}` interpolation forms, which previously raised `a dynamic ~p interpolation must follow a static segment` at compile time in every position ([#15](https://github.com/elixir-localize/localize_web/issues/15)). Substituting the token left the enclosing `::binary` wrapper in place, so Phoenix saw a literal inside a dynamic segment and matched none of its route-verification clauses.
+* `~q` now resolves the `#{locale}`, `#{language}` and `#{territory}` interpolation forms, which previously raised `a dynamic ~p interpolation must follow a static segment` at compile time in every position. Substituting the token left the enclosing `::binary` wrapper in place, so Phoenix saw a literal inside a dynamic segment and matched none of its route-verification clauses. Thanks to @sumerokr for the report. Closes #15.
 
-* `mix phx.routes <Router>.LocalizedRoutes` now works, where it raised `function ... formatted_routes/1 is undefined` ([#16](https://github.com/elixir-localize/localize_web/issues/16)). The generated module hosts route definitions but is not a router, so the `formatted_routes/1` and `__helpers__/0` callbacks `Phoenix.Router.ConsoleFormatter` calls are now defined on it.
+* `mix phx.routes <Router>.LocalizedRoutes` now works, where it raised `function ... formatted_routes/1 is undefined`. The generated module hosts route definitions but is not a router, so the `formatted_routes/1` and `__helpers__/0` callbacks `Phoenix.Router.ConsoleFormatter` calls are now defined on it. Thanks to @sumerokr for the report. Closes #16.
 
 ### Documentation
 
+* Align the documentation module names to the canonical Phoenix generator forms. Thanks to @sumerokr for the PRs. Closes #13, #14.
+
 * `Localize.VerifiedRoutes` documents that every option other than `:gettext` passes through to `Phoenix.VerifiedRoutes`, and that `:statics` in particular must be kept when converting from `use Phoenix.VerifiedRoutes` — without it the asset paths in the default Phoenix layouts warn that no route matches ([#16](https://github.com/elixir-localize/localize_web/issues/16)).
 
-### Removed
+* The guides now name web-layer modules `MyAppWeb.*` as Phoenix's generators do, rather than `MyApp.*`, and the installation snippets require `~> 1.0` instead of the long-superseded `~> 0.1.0`. Thanks to @sumerokr for both ([#13](https://github.com/elixir-localize/localize_web/pull/13), [#14](https://github.com/elixir-localize/localize_web/pull/14)), and for the two reports above.
 
 * The `LocalizeWeb` module. It defined no functions — only a moduledoc listing the plugs, routes and HTML helpers, all of which live under `Localize.*` and are unaffected.
 
