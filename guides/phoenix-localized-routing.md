@@ -257,6 +257,16 @@ The `~q` sigil supports the same locale interpolations as the `localize` macro:
 # Produces "/fr/pages_fr/intro" when the locale is :fr
 ```
 
+`#{language}` and `#{territory}` are recognised in the same way, and the token may appear in any segment, not only the first:
+
+```elixir
+~q"/users/#{id}/faces/#{face_id}/#{locale}/visages"
+```
+
+Despite the syntax, `locale` is not a variable — it is a token the sigil recognises, resolved at compile time once per locale branch, and no binding of that name is consulted. A path may mix it freely with genuine runtime interpolation such as `#{id}` above.
+
+`~q` also accepts a colon form — `~q"/:locale/pages/intro"` — which does the same thing. Prefer the interpolation form: it is the only one the `localize` macro accepts when *defining* routes, because in a router `:locale` is an ordinary Phoenix path parameter and is left untouched. Using the interpolation form in both places keeps route definitions and the paths that reference them written the same way.
+
 ### Rendering a Path or URL in a Specific Locale
 
 `~q` dispatches on the *current* process locale (`Localize.get_locale/0`). When you need to render a link in a different locale at the call site — without changing the process locale — use `path_for/2` and `url_for/2`. Typical use cases are language switchers and emitting hreflang links per locale in one template pass.

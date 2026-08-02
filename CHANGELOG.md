@@ -2,7 +2,11 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] — 2026-07-31
+## [1.0.1] — 2026-08-03
+
+### Fixed
+
+* `~q` now resolves the `#{locale}`, `#{language}` and `#{territory}` interpolation forms, which previously raised `a dynamic ~p interpolation must follow a static segment` at compile time in every position ([#15](https://github.com/elixir-localize/localize_web/issues/15)). Substituting the token left the enclosing `::binary` wrapper in place, so Phoenix saw a literal inside a dynamic segment and matched none of its route-verification clauses.
 
 ### Removed
 

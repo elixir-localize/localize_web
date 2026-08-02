@@ -22,11 +22,38 @@ defmodule Localize.VerifiedRoutes do
 
   ### Locale Interpolation
 
-  * `:locale` is replaced with the CLDR locale name.
+  A path may embed the current locale in one of its segments. Three
+  tokens are recognised:
 
-  * `:language` is replaced with the CLDR language code.
+  * `locale` is replaced with the CLDR locale name.
 
-  * `:territory` is replaced with the CLDR territory code.
+  * `language` is replaced with the CLDR language code.
+
+  * `territory` is replaced with the CLDR territory code.
+
+  Each is written in one of two forms, and both resolve at compile time,
+  once per locale branch:
+
+      ~q"/\#{locale}/pages/intro"     # interpolation form
+      ~q"/:locale/pages/intro"       # colon form
+
+  The interpolation form looks like ordinary Elixir interpolation but is
+  not — `locale` is a token recognised by the sigil, not a variable, and
+  no binding of that name is consulted. It is the form to prefer, because
+  it is the only one the `Localize.Routes.localize/1` macro accepts when
+  defining routes: in a router, `:locale` is an ordinary Phoenix path
+  parameter and is left alone.
+
+      # in the router
+      localize do
+        get "/\#{locale}/pages/:page", PageController, :show
+      end
+
+      # in a template, matching that route
+      ~q"/\#{locale}/pages/intro"
+
+  The colon form is accepted in `~q` for convenience and has no router
+  counterpart.
 
   ### Rendering a path or URL in a specific locale
 

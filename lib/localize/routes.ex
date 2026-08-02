@@ -374,24 +374,61 @@ defmodule Localize.Routes do
     path
     |> interpolate(locale)
     |> translate_path_now(locale, gettext_locale, gettext_backend)
+    |> merge_literal_segments()
   end
 
   @doc false
   def interpolate(path, locale) do
     Macro.prewalk(path, fn
-      {{:., _, [Kernel, :to_string]}, _, [{:locale, _, _}]} ->
-        to_string(locale.cldr_locale_id) |> String.downcase()
+      # Replace the whole `::binary` wrapper, not merely the
+      # `Kernel.to_string/1` call inside it. Substituting only the inner
+      # call leaves `<<"/", "en"::binary, "/users">>`, and Phoenix's route
+      # verifier matches a dynamic segment only as a `::binary` around a
+      # `Kernel.to_string/1` call — a literal inside one matches none of
+      # its clauses and reaches the catch-all that raises "a dynamic ~p
+      # interpolation must follow a static segment".
+      {:"::", _meta, [{{:., _, [Kernel, :to_string]}, _, [{token, _, _}]}, {:binary, _, _}]}
+      when token in [:locale, :language, :territory] ->
+        interpolated_value(token, locale)
 
-      {{:., _, [Kernel, :to_string]}, _, [{:language, _, _}]} ->
-        to_string(locale.language) |> String.downcase()
-
-      {{:., _, [Kernel, :to_string]}, _, [{:territory, _, _}]} ->
-        to_string(locale.territory) |> String.downcase()
+      # The same tokens unwrapped, for callers that walk a path fragment
+      # rather than a whole binary construction.
+      {{:., _, [Kernel, :to_string]}, _, [{token, _, _}]}
+      when token in [:locale, :language, :territory] ->
+        interpolated_value(token, locale)
 
       other ->
         other
     end)
   end
+
+  defp interpolated_value(:locale, locale),
+    do: locale.cldr_locale_id |> to_string() |> String.downcase()
+
+  defp interpolated_value(:language, locale),
+    do: locale.language |> to_string() |> String.downcase()
+
+  defp interpolated_value(:territory, locale),
+    do: locale.territory |> to_string() |> String.downcase()
+
+  # Folds adjacent literal segments into one binary, leaving genuine
+  # runtime interpolations untouched. Once a locale token has been
+  # substituted the path holds consecutive literals — `["/", "en",
+  # "/users"]` — and Phoenix accepts a static segment only when it begins
+  # with "/", so the pieces have to be joined into `["/en/users"]` before
+  # `sigil_p` sees them.
+  defp merge_literal_segments({:<<>>, meta, segments}) do
+    {:<<>>, meta, merge_literals(segments)}
+  end
+
+  defp merge_literal_segments(other), do: other
+
+  defp merge_literals([first, second | rest]) when is_binary(first) and is_binary(second) do
+    merge_literals([first <> second | rest])
+  end
+
+  defp merge_literals([segment | rest]), do: [segment | merge_literals(rest)]
+  defp merge_literals([]), do: []
 
   @doc false
   def translate_path_now(path, locale, gettext_locale, gettext_backend) do
