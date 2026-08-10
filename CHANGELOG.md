@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.HTML.Currency.select/3`, `Localize.HTML.Locale.select/3`, `Localize.HTML.Territory.select/3` and `Localize.Plug.put_locale_from_session/2` are specified as returning `{:error, Exception.t()}`. Each reports an invalid locale as an exception struct rather than the `{module, message}` tuple its specification claimed — the same correction made to `Localize.HTML.Unit.select/3` in 1.0.0, which the others were missed in.
 
+* `Localize.HTML.Month.select/3` and `month_options/1` now validate the `:locale` option, returning `{:error, Exception.t()}` as every other select does. They previously ignored an invalid locale and rendered month names in the default one, so a typo produced English months rather than an error.
+
 ## [1.0.1] — 2026-08-03
 
 ### Fixed

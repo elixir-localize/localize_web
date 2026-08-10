@@ -63,12 +63,19 @@ defmodule Localize.HTML.Month do
           form :: Phoenix.HTML.Form.t(),
           field :: Phoenix.HTML.Form.field(),
           select_options
-        ) :: Phoenix.HTML.safe()
+        ) :: Phoenix.HTML.safe() | {:error, Exception.t()}
 
   def select(form, field, options \\ [])
 
   def select(form, field, options) when is_list(options) do
-    options = validate_options(options)
+    do_select(form, field, validate_options(options))
+  end
+
+  defp do_select(_form, _field, {:error, reason}) do
+    {:error, reason}
+  end
+
+  defp do_select(form, field, options) do
     month_options = build_month_options(options)
 
     select_options =
@@ -95,19 +102,30 @@ defmodule Localize.HTML.Month do
   * A list of `{month_name, month_number}` tuples.
 
   """
-  @spec month_options(select_options) :: list(tuple())
+  @spec month_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 
   def month_options(options \\ [])
 
   def month_options(options) when is_list(options) do
-    options
-    |> validate_options()
-    |> build_month_options()
+    case validate_options(options) do
+      {:error, reason} -> {:error, reason}
+      options -> build_month_options(options)
+    end
   end
 
   defp validate_options(options) do
     options = Map.new(options)
-    Map.merge(default_options(), options)
+
+    with options <- Map.merge(default_options(), options),
+         {:ok, options} <- validate_locale(options) do
+      options
+    end
+  end
+
+  defp validate_locale(%{locale: locale} = options) do
+    with {:ok, locale} <- Localize.validate_locale(locale) do
+      {:ok, Map.put(options, :locale, locale)}
+    end
   end
 
   defp default_options do
@@ -131,13 +149,9 @@ defmodule Localize.HTML.Month do
     mapper = Map.fetch!(options, :mapper)
     calendar = Map.fetch!(options, :calendar)
 
-    locale_id =
-      case locale do
-        %Localize.LanguageTag{cldr_locale_id: id} -> id
-        other -> other
-      end
-
-    month_names = get_month_names(locale_id, style, calendar)
+    # `validate_locale/1` resolves the option to a language tag before this
+    # runs, so the CLDR id is always reachable directly.
+    month_names = get_month_names(locale.cldr_locale_id, style, calendar)
 
     months
     |> Enum.map(fn month_number ->
