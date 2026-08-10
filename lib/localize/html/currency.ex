@@ -56,7 +56,7 @@ defmodule Localize.HTML.Currency do
           select_options
         ) ::
           Phoenix.HTML.safe()
-          | {:error, {module(), binary()}}
+          | {:error, Exception.t()}
 
   def select(form, field, options \\ [])
 

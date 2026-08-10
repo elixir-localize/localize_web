@@ -45,7 +45,7 @@ defmodule Localize.Plug do
 
   """
   @spec put_locale_from_session(map(), keyword()) ::
-          {:ok, Localize.LanguageTag.t()} | {:error, {module(), String.t()}}
+          {:ok, Localize.LanguageTag.t()} | {:error, Exception.t()}
 
   def put_locale_from_session(session, options \\ [])
 

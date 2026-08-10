@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.HTML.Subdivision` generates `<select>` tags and option lists for the subdivisions of a territory — US states, Canadian provinces, French departments — localized and sorted with `Localize.Collation`. CLDR writes a subdivision code as its territory plus the ISO 3166-2 code, so `:usca` becomes an option value of `"ca"`; pass `full_codes: true` to keep the CLDR form.
 
+### Fixed
+
+* `Localize.HTML.Currency.select/3`, `Localize.HTML.Locale.select/3`, `Localize.HTML.Territory.select/3` and `Localize.Plug.put_locale_from_session/2` are specified as returning `{:error, Exception.t()}`. Each reports an invalid locale as an exception struct rather than the `{module, message}` tuple its specification claimed — the same correction made to `Localize.HTML.Unit.select/3` in 1.0.0, which the others were missed in.
+
 ## [1.0.1] — 2026-08-03
 
 ### Fixed

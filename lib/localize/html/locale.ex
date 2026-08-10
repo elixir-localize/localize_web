@@ -66,7 +66,7 @@ defmodule Localize.HTML.Locale do
           field :: Phoenix.HTML.Form.field(),
           select_options
         ) ::
-          Phoenix.HTML.safe() | {:error, {module(), binary()}}
+          Phoenix.HTML.safe() | {:error, Exception.t()}
 
   def select(form, field, options \\ [])
 
