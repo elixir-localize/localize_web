@@ -143,6 +143,12 @@ defmodule Localize.HTML do
   defdelegate territory_select(form, field, options), to: Localize.HTML.Territory, as: :select
   defdelegate territory_options(options), to: Localize.HTML.Territory, as: :territory_options
 
+  defdelegate subdivision_select(form, field, options), to: Localize.HTML.Subdivision, as: :select
+
+  defdelegate subdivision_options(options),
+    to: Localize.HTML.Subdivision,
+    as: :subdivision_options
+
   defdelegate locale_select(form, field, options), to: Localize.HTML.Locale, as: :select
   defdelegate locale_options(options), to: Localize.HTML.Locale, as: :locale_options
 

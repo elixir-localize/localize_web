@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-08-11
+
+### Added
+
+* `Localize.HTML.Subdivision` generates `<select>` tags and option lists for the subdivisions of a territory — US states, Canadian provinces, French departments — localized and sorted with `Localize.Collation`. CLDR writes a subdivision code as its territory plus the ISO 3166-2 code, so `:usca` becomes an option value of `"ca"`; pass `full_codes: true` to keep the CLDR form.
+
 ## [1.0.1] — 2026-08-03
 
 ### Fixed
