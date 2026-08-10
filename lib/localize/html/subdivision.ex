@@ -71,7 +71,7 @@ defmodule Localize.HTML.Subdivision do
           form :: Phoenix.HTML.Form.t() | atom(),
           field :: Phoenix.HTML.Form.field() | atom(),
           select_options()
-        ) :: Phoenix.HTML.safe() | {:error, {module(), String.t()}}
+        ) :: Phoenix.HTML.safe() | {:error, Exception.t()}
 
   def select(form, field, options \\ [])
 
