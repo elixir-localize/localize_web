@@ -90,6 +90,7 @@ defmodule LocalizeWeb.MixProject do
           Localize.HTML,
           Localize.HTML.Currency,
           Localize.HTML.Territory,
+          Localize.HTML.Subdivision,
           Localize.HTML.Locale,
           Localize.HTML.Unit,
           Localize.HTML.Month,

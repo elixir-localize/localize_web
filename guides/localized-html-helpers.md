@@ -4,7 +4,7 @@ This guide covers the HTML form helpers provided by `localize_web` for generatin
 
 ## Overview
 
-The HTML helpers generate `<select>` tags for currencies, territories, locales, units of measure, and months. Display names are localized according to the current or specified locale using CLDR data from the [Localize](https://hex.pm/packages/localize) library.
+The HTML helpers generate `<select>` tags for currencies, territories, territory subdivisions, locales, units of measure, and months. Display names are localized according to the current or specified locale using CLDR data from the [Localize](https://hex.pm/packages/localize) library.
 
 Each helper module provides two public functions:
 
@@ -69,6 +69,62 @@ iex> Localize.HTML.Territory.territory_options(
 ...>   locale: "fr"
 ...> )
 [{"🇦🇺 Australie", :AU}, {"🇬🇧 Royaume-Uni", :GB}, {"🇺🇸 États-Unis", :US}]
+```
+
+## Subdivision Select
+
+Displays the subdivisions of a territory — US states, Canadian provinces, French regions — with their localized names:
+
+```elixir
+iex> Localize.HTML.Subdivision.select(:address, :state, territory: :US, selected: "ny")
+```
+
+CLDR writes a subdivision code as its territory followed by the ISO 3166-2 code, so California is `:usca`. The territory is stripped from the option value, giving `"ca"` — the form receives the subdivision as it is written in an address.
+
+### Options
+
+* `:territory` — the territory whose subdivisions are listed, for example `:US`. Required.
+
+* `:locale` — the locale used to localize subdivision names. The default is `Localize.get_locale/0`.
+
+* `:full_codes` — keeps the CLDR code (`:usca`) as the option value rather than stripping the territory (`"ca"`). The default is `false`.
+
+* `:selected` — the subdivision to pre-select. Accepts either form of the code.
+
+* `:prompt` — a prompt string displayed at the top of the select box.
+
+* `:collator` — a function to sort subdivisions. The default sorts by localized name using `Localize.Collation`, so the order is correct for the locale. Receives a list of `%{subdivision_code: string, full_code: atom, name: string}` maps.
+
+* `:mapper` — a function to produce the display text for each subdivision. The default is `&({&1.name, &1.subdivision_code})`.
+
+### Displaying in a Different Locale
+
+```elixir
+# US states in Spanish
+iex> Localize.HTML.Subdivision.subdivision_options(territory: :US, locale: :es)
+```
+
+Names are sorted for the requested locale rather than by ASCII order, so accented names appear where a reader of that language expects them.
+
+### Mapping to Your Own Identifiers
+
+Where subdivisions are stored as foreign keys, the `:mapper` bridges the CLDR code to your own identifier:
+
+```elixir
+ids = Repo.all(from s in State, select: {s.code, s.id}) |> Map.new()
+
+Localize.HTML.Subdivision.select(form, :state_id,
+  territory: :US,
+  mapper: &{&1.name, Map.get(ids, &1.subdivision_code)}
+)
+```
+
+CLDR lists 57 US subdivisions — the 50 states plus DC, Puerto Rico, Guam and the other outlying areas — so a table seeded with only the 50 states leaves the rest unmapped.
+
+### Getting Options Without the Select Tag
+
+```elixir
+iex> Localize.HTML.Subdivision.subdivision_options(territory: :CA)
 ```
 
 ## Currency Select
