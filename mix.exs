@@ -40,7 +40,7 @@ defmodule LocalizeWeb.MixProject do
     [
       licenses: ["Apache-2.0"],
       links: links(),
-      files: ~w(lib priv guides mix.exs README.md LICENSE.md CHANGELOG.md)
+      files: ~w(lib priv guides mix.exs README.md usage-rules.md LICENSE.md CHANGELOG.md)
     ]
   end
 
@@ -59,6 +59,7 @@ defmodule LocalizeWeb.MixProject do
       formatters: ["html", "markdown"],
       extras: [
         "README.md",
+        "usage-rules.md",
         "CHANGELOG.md",
         "guides/http-locale-discovery.md",
         "guides/phoenix-localized-routing.md",
