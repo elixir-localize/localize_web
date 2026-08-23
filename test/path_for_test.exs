@@ -74,4 +74,35 @@ defmodule PathFor.Test do
       assert url_for(:de, "/users/:locale") == "http://localhost/users_de/de"
     end
   end
+
+  describe "hreflang_links/1" do
+    test "annotates every configured locale with a fully-qualified url" do
+      assert {:ok, safe} = hreflang_links("/users")
+      html = Phoenix.HTML.safe_to_string(safe)
+
+      for {locale, path} <- [{"en", "/users"}, {"fr", "/users_fr"}, {"de", "/users_de"}] do
+        assert html =~ ~s|hreflang="#{locale}"|
+        assert html =~ ~s|href="http://localhost#{path}"|
+      end
+
+      assert html =~ ~s|rel="alternate"|
+    end
+
+    test "is independent of the process locale" do
+      Localize.put_locale(:fr)
+      {:ok, from_fr} = hreflang_links("/users")
+
+      Localize.put_locale(:en)
+      {:ok, from_en} = hreflang_links("/users")
+
+      assert Phoenix.HTML.safe_to_string(from_fr) == Phoenix.HTML.safe_to_string(from_en)
+    end
+
+    test "the set is self-referential, as search engines require" do
+      {:ok, safe} = hreflang_links("/users")
+      html = Phoenix.HTML.safe_to_string(safe)
+
+      assert length(String.split(html, "rel=\"alternate\"")) - 1 == 3
+    end
+  end
 end

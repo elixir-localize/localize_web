@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+* `Localize.HTML.Hreflang.links/2` renders `rel="alternate"` `hreflang` annotations from a map of locale to URL, validating each locale and rendering it in canonical BCP 47 form. The key `"x-default"` designates the fallback variant and is emitted as supplied.
+
+* `hreflang_links/2` in `Localize.VerifiedRoutes` renders the annotation set for a route across every configured locale, so verified routes have the same support the generated helpers had.
+
+### Changed
+
+* **Breaking.** `Localize.Routes.LocalizedHelpers.hreflang_links/1` returns `{:ok, safe}` or `{:error, exception}` rather than the rendered HTML directly, and no longer emits an annotation it cannot validate. A locale that does not resolve returns `Localize.InvalidLocaleError`, and a URL that is not fully qualified returns `Localize.RelativeUrlError`. Both were previously emitted verbatim, and both are ignored silently by search engines and agents — a site annotated with `hreflang="es-SP"` or a relative `href` appears not to declare the variant at all, with nothing to indicate why. Locales are also rendered canonically, so `"es_MX"` becomes `"es-MX"`: the underscore validates but BCP 47 requires a hyphen.
+
 ## [1.1.0] — 2026-08-11
 
 ### Added

@@ -148,7 +148,7 @@ defmodule Localize.Routes.Test do
       conn = get(build_conn(), "/users/1")
 
       links = MyApp.Router.LocalizedHelpers.user_links(conn, :show, 1)
-      header_io_data = MyApp.Router.LocalizedHelpers.hreflang_links(links)
+      {:ok, header_io_data} = MyApp.Router.LocalizedHelpers.hreflang_links(links)
       header = Phoenix.HTML.safe_to_string(header_io_data)
 
       assert links == %{
@@ -167,7 +167,7 @@ defmodule Localize.Routes.Test do
       conn = get(build_conn(), "/not_localized/1")
 
       links = MyApp.Router.LocalizedHelpers.not_localized_links(conn, :show, 1)
-      header_io_data = MyApp.Router.LocalizedHelpers.hreflang_links(links)
+      {:ok, header_io_data} = MyApp.Router.LocalizedHelpers.hreflang_links(links)
       header = Phoenix.HTML.safe_to_string(header_io_data)
 
       assert links == %{}

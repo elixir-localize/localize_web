@@ -220,6 +220,65 @@ defmodule Localize.VerifiedRoutes do
   end
 
   @doc ~S'''
+  Generates `rel="alternate"` `hreflang` link tags for every configured locale.
+
+  Renders `route` once per locale configured in the Gettext backend and
+  annotates each with its locale, which is what tells a search engine or an
+  agent that the variants exist. Nothing sends `Accept-Language` on a reader's
+  behalf, so this declaration is the signal.
+
+  Every locale is validated and rendered in canonical BCP 47 form, and every
+  URL must be fully qualified — a malformed annotation is ignored silently by
+  every consumer, so an error is returned rather than bad markup emitted. See
+  `Localize.HTML.Hreflang.links/2`.
+
+  ### Arguments
+
+  * `route` is a string literal route accepted by `sigil_q/2`.
+
+  * `options` is a keyword list passed to `Localize.HTML.Hreflang.links/2`.
+
+  ### Returns
+
+  * `{:ok, safe}` where `safe` is rendered HTML, or
+
+  * `{:error, exception}`.
+
+  ### Examples
+
+      # In a template <head>
+      <%= case hreflang_links("/users") do %>
+        <% {:ok, links} -> %><%= links %>
+        <% {:error, _} -> %>
+      <% end %>
+
+  '''
+  defmacro hreflang_links(route, options \\ []) do
+    gettext = Module.get_attribute(__CALLER__.module, :_localize_gettext_backend)
+    locale_ids = Localize.Routes.locales_from_gettext(gettext)
+    route_ast = Localize.VerifiedRoutes.normalize_route_ast(route)
+
+    case_clauses =
+      Localize.VerifiedRoutes.sigil_q_case_clauses(route_ast, [], locale_ids, gettext)
+
+    pairs =
+      Enum.map(locale_ids, fn locale ->
+        case_expr =
+          quote location: :keep do
+            case unquote(locale) do
+              unquote(case_clauses)
+            end
+          end
+
+        {Kernel.to_string(locale), wrap_sigil_p_in_url(case_expr)}
+      end)
+
+    quote location: :keep do
+      Localize.HTML.Hreflang.links(unquote({:%{}, [], pairs}), unquote(options))
+    end
+  end
+
+  @doc ~S'''
   Generates a localized verified URL in a specific locale.
 
   Like `path_for/2` but returns a full URL via `Phoenix.VerifiedRoutes.url/1`.

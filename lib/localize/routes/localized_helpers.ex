@@ -484,26 +484,31 @@ defmodule Localize.Routes.LocalizedHelpers do
   end
 
   @doc """
-  Generates HTML `link` tags for a given map of locale => URLs.
+  Generates `rel="alternate"` `hreflang` link tags for a map of locale to URL.
+
+  Every locale is validated and rendered in canonical BCP 47 form, and every
+  URL must be fully qualified. A malformed annotation is ignored silently by
+  search engines and agents — the site simply appears not to declare the
+  variant — so an error is returned rather than bad markup emitted.
+
+  ### Arguments
+
+  * `url_map` is a map of locale to fully-qualified URL, as returned by the
+    generated `*_links` helpers. The key `"x-default"` designates the
+    fallback variant and is emitted as-is.
+
+  * `options` is a keyword list passed to `Localize.HTML.Hreflang.links/2`.
+
+  ### Returns
+
+  * `{:ok, safe}` where `safe` is rendered HTML, or
+
+  * `{:error, exception}`.
 
   """
-  @spec hreflang_links(%{locale_name() => url()}) :: Phoenix.HTML.safe()
-  def hreflang_links(nil) do
-    {:safe, []}
-  end
-
-  def hreflang_links(url_map) when is_map(url_map) do
-    links =
-      for {locale, url} <- url_map do
-        {:safe, link} =
-          PhoenixHTMLHelpers.Tag.tag(:link, href: url, rel: "alternate", hreflang: locale)
-
-        link
-      end
-      |> Enum.intersperse(?\n)
-
-    {:safe, links}
-  end
+  @spec hreflang_links(%{locale_name() => url()} | nil, keyword()) ::
+          {:ok, Phoenix.HTML.safe()} | {:error, Exception.t()}
+  defdelegate hreflang_links(url_map, options \\ []), to: Localize.HTML.Hreflang, as: :links
 
   @doc false
   def strip_locale(helper, locale)
