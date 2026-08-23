@@ -76,7 +76,23 @@ defmodule Localize.Plug.PutLocale do
 
   @language_header "accept-language"
 
-  @generic_tlds ~w(com org net edu gov mil int)
+  # A country-code TLD is always exactly two ASCII letters. Every generic TLD
+  # is longer, so a length test excludes all of them at once and keeps doing
+  # so as new ones are created — more durable than a list, and necessary:
+  # "com" upcases to "COM", which is the ISO alpha-3 code for Comoros and
+  # validates to :KM.
+  @cctld_length 2
+
+  # Country-code TLDs sold and used as generic domains far more often than as
+  # country markers. Resolving these to a territory produces a language the
+  # reader is unlikely to speak — ".co" would yield Spanish, ".me" Serbian,
+  # ".ly" Arabic — on domains chosen for the letters, not the country.
+  #
+  # A miss here is cheap: the next entry in :from is consulted. A wrong answer
+  # is expensive. The doubtful cases are therefore excluded, and the list is
+  # replaceable via the :generic_tlds option for a site that genuinely is
+  # Colombian or Montenegrin.
+  @generic_use_cctlds ~w(ai cc co fm gg io ly me nu sh st to tv ws)
 
   @doc false
   def init(options) do
@@ -175,42 +191,86 @@ defmodule Localize.Plug.PutLocale do
   @doc """
   Attempts to resolve a locale from a hostname's top-level domain.
 
-  Extracts the TLD, validates it as a territory code, and returns
-  the best matching locale for that territory.
+  Extracts the TLD, validates it as a territory code, and returns the best
+  matching locale for that territory.
+
+  Note what this can and cannot tell you. A TLD identifies a *territory*, and
+  the language is then inferred from it, so the result is only as good as that
+  inference: Belgium has three official languages, Switzerland four, Canada
+  two. Prefer `:host` below the sources that carry an actual language — the
+  path, a cookie, the session, `accept-language` — rather than above them.
+
+  Generic top-level domains resolve to nothing, as do country-code domains
+  that are predominantly used generically. See the `:generic_tlds` option.
+
+  Where a domain and a territory code disagree — `.uk` is the domain while
+  `GB` is the code — resolution relies on `Localize.validate_territory/1`
+  applying CLDR's territory aliases.
 
   ### Arguments
 
   * `host` is a hostname string (e.g., "example.co.uk").
 
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:generic_tlds` is a list of lowercase country-code TLDs to treat as
+    generic and resolve to `nil`. The default is
+    `#{inspect(@generic_use_cctlds)}`. Pass a list without a given entry to
+    have that domain resolve to its territory — appropriate for a site whose
+    `.co` really is Colombian.
+
   ### Returns
 
   * `{:ok, Localize.LanguageTag.t()}` or
 
-  * `{:error, reason}`
+  * `nil` if the TLD is generic, or is not a territory.
+
+  ### Examples
+
+      iex> {:ok, locale} = Localize.Plug.PutLocale.locale_from_host("example.de")
+      iex> locale.territory
+      :DE
+
+      # Generic, so no territory is inferred
+      iex> Localize.Plug.PutLocale.locale_from_host("example.com")
+      nil
+
+      # A country-code domain used generically
+      iex> Localize.Plug.PutLocale.locale_from_host("example.co")
+      nil
+
+      # ...unless the caller says otherwise
+      iex> {:ok, locale} = Localize.Plug.PutLocale.locale_from_host("example.co", generic_tlds: [])
+      iex> locale.territory
+      :CO
 
   """
-  def locale_from_host(nil), do: nil
+  def locale_from_host(host, options \\ [])
 
-  def locale_from_host(host) when is_binary(host) do
+  def locale_from_host(nil, _options), do: nil
+
+  def locale_from_host(host, options) when is_binary(host) do
+    generic = Keyword.get(options, :generic_tlds, @generic_use_cctlds)
+
     tld =
       host
       |> String.split(".")
       |> List.last()
       |> String.downcase()
 
-    if tld in @generic_tlds do
-      nil
+    with true <- country_code_tld?(tld),
+         false <- tld in generic,
+         {:ok, territory} <- Localize.validate_territory(String.upcase(tld)) do
+      Localize.validate_locale("und-#{territory}")
     else
-      territory = String.upcase(tld)
-
-      case Localize.validate_territory(territory) do
-        {:ok, territory_code} ->
-          Localize.validate_locale("und-#{territory_code}")
-
-        _error ->
-          nil
-      end
+      _not_a_country_code -> nil
     end
+  end
+
+  defp country_code_tld?(tld) do
+    String.length(tld) == @cctld_length and tld =~ ~r/^[a-z]{2}$/
   end
 
   defp locale_from_params(conn, from, options) do
@@ -272,10 +332,10 @@ defmodule Localize.Plug.PutLocale do
     |> validate_locale_param()
   end
 
-  defp fetch_param(conn, :host, _param, _options) do
+  defp fetch_param(conn, :host, _param, options) do
     conn
     |> Map.get(:host)
-    |> locale_from_host()
+    |> locale_from_host(Keyword.take(options, [:generic_tlds]))
   end
 
   defp fetch_param(conn, :route, _param, _options) do

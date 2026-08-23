@@ -6,6 +6,8 @@ defmodule Localize.Plug.PutLocaleTest do
 
   alias Localize.Plug.PutLocale
 
+  doctest Localize.Plug.PutLocale, import: true
+
   @default_locale Localize.default_locale()
 
   describe "init/1" do
@@ -411,6 +413,53 @@ defmodule Localize.Plug.PutLocaleTest do
 
     test "returns nil for nil host" do
       assert PutLocale.locale_from_host(nil) == nil
+    end
+
+    test "returns nil for generic top-level domains of any length" do
+      # A country code is two letters; everything longer is generic. The
+      # length test matters beyond tidiness: "com" is the ISO alpha-3 code
+      # for Comoros and validates as a territory.
+      for host <- ~w(example.com example.org example.net example.app
+                     example.cloud example.museum example.travel) do
+        assert PutLocale.locale_from_host(host) == nil, "#{host} resolved"
+      end
+    end
+
+    test "returns nil for country-code domains used generically" do
+      # Resolving these names a language the reader probably does not speak:
+      # .co would be Spanish, .me Serbian, .ly Arabic.
+      for host <- ~w(acme.co acme.io acme.ai acme.me acme.tv acme.ly
+                     acme.gg acme.sh acme.cc acme.fm acme.ws acme.to
+                     acme.nu acme.st) do
+        assert PutLocale.locale_from_host(host) == nil, "#{host} resolved"
+      end
+    end
+
+    test "a caller can reclaim a generically-used domain" do
+      assert {:ok, locale} = PutLocale.locale_from_host("example.co", generic_tlds: [])
+      assert locale.territory == :CO
+
+      assert {:ok, locale} = PutLocale.locale_from_host("example.me", generic_tlds: ["co"])
+      assert locale.territory == :ME
+    end
+
+    test "still resolves genuine country-code domains" do
+      for {host, territory} <- [
+            {"example.de", :DE},
+            {"example.fr", :FR},
+            {"example.jp", :JP},
+            {"example.br", :BR},
+            {"shop.example.it", :IT}
+          ] do
+        assert {:ok, locale} = PutLocale.locale_from_host(host)
+        assert locale.territory == territory
+      end
+    end
+
+    test "ignores non-ASCII and malformed labels rather than guessing" do
+      for host <- ["example.\u0440\u0444", "example.", "example", "a.b.c.d"] do
+        assert PutLocale.locale_from_host(host) == nil, "#{host} resolved"
+      end
     end
   end
 
