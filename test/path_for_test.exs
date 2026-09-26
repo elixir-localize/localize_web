@@ -56,6 +56,7 @@ defmodule PathFor.Test do
       assert path_for("fr", "/users") == "/users_fr"
       assert path_for(:"fr-CH", "/users") == "/users_fr"
       assert path_for(fr, "/users") == "/users_fr"
+      assert path_for(Localize.LanguageTag.new!("fr-CH"), "/users") == "/users_fr"
     end
 
     test "renders the default locale's (:en) route for :ja, which has no routes" do
