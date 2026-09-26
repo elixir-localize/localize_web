@@ -448,8 +448,6 @@ defmodule Localize.Routes do
     {:<<>>, meta, merge_literals(segments)}
   end
 
-  defp merge_literal_segments(other), do: other
-
   defp merge_literals([first, second | rest]) when is_binary(first) and is_binary(second) do
     merge_literals([first <> second | rest])
   end
@@ -458,42 +456,40 @@ defmodule Localize.Routes do
   defp merge_literals([]), do: []
 
   @doc false
-  def translate_path_now(path, locale, gettext_locale, gettext_backend) do
-    Macro.prewalk(path, fn segment ->
-      translate_segment_now(locale, gettext_locale, gettext_backend, segment)
-    end)
-  end
+  # Only literal path segments are translated. Once a query or fragment
+  # begins, the rest of the route, including later literal segments, is
+  # left as is. Code inside `#{...}` is never walked.
+  def translate_path_now({:<<>>, meta, segments}, locale, gettext_locale, gettext_backend) do
+    {segments, _in_query?} =
+      Enum.map_reduce(segments, false, fn
+        segment, false when is_binary(segment) ->
+          translate_segment_now(locale, gettext_locale, gettext_backend, segment)
 
-  defp translate_segment_now(_locale, _gettext_locale, _backend, "" = segment), do: segment
+        segment, in_query? ->
+          {segment, in_query?}
+      end)
+
+    {:<<>>, meta, segments}
+  end
 
   defp translate_segment_now(_locale, _gettext_locale, _backend, @interpolate <> _rest = segment),
-    do: segment
+    do: {segment, false}
 
-  defp translate_segment_now(_locale, _gettext_locale, _backend, segment)
-       when not is_binary(segment),
-       do: segment
+  defp translate_segment_now(locale, gettext_locale, gettext_backend, segment) do
+    case :binary.match(segment, ["?", "#"]) do
+      :nomatch ->
+        {translate_segment_parts(segment, locale, gettext_locale, gettext_backend), false}
 
-  defp translate_segment_now(locale, gettext_locale, gettext_backend, segment)
-       when is_binary(segment) do
-    segment
+      {start, _length} ->
+        {path, query} = :erlang.split_binary(segment, start)
+        {translate_segment_parts(path, locale, gettext_locale, gettext_backend) <> query, true}
+    end
+  end
+
+  defp translate_segment_parts(path, locale, gettext_locale, gettext_backend) do
+    path
     |> String.split("/")
-    |> translate_segment_parts(locale, gettext_locale, gettext_backend)
-    |> Enum.join("/")
-  end
-
-  defp translate_segment_parts([last_part], locale, gettext_locale, gettext_backend) do
-    [last_part | rest] = Regex.split(~r/[#\?]/, last_part, include_captures: true)
-
-    [translate_segment_part(last_part, locale, gettext_locale, gettext_backend) | rest]
-    |> :erlang.iolist_to_binary()
-    |> List.wrap()
-  end
-
-  defp translate_segment_parts([part | rest], locale, gettext_locale, gettext_backend) do
-    [
-      translate_segment_part(part, locale, gettext_locale, gettext_backend)
-      | translate_segment_parts(rest, locale, gettext_locale, gettext_backend)
-    ]
+    |> Enum.map_join("/", &translate_segment_part(&1, locale, gettext_locale, gettext_backend))
   end
 
   defp translate_segment_part("", _locale, _gettext_locale, _backend), do: ""
