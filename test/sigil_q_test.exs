@@ -76,4 +76,9 @@ defmodule SigilQTest do
     assert ~q"/users?next=/users" == "/users_fr?next=/users"
     assert ~q"/users?page=#{2}&next=/users" == "/users_fr?page=2&next=/users"
   end
+
+  test "sigil_q does not translate string literals in interpolated code" do
+    Localize.put_locale(:fr)
+    assert ~q"/users/#{String.upcase("users")}" == "/users_fr/USERS"
+  end
 end
