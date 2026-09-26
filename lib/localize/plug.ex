@@ -8,6 +8,14 @@ defmodule Localize.Plug do
 
   @session_key Localize.Plug.PutLocale.session_key()
 
+  defmodule NoSessionLocaleError do
+    @moduledoc """
+    Returned by `Localize.Plug.put_locale_from_session/2` when the session has no locale.
+    """
+
+    defexception message: "No locale was found in the session"
+  end
+
   @doc """
   Puts the locale from the session into the current process.
 
@@ -30,7 +38,7 @@ defmodule Localize.Plug do
   * `{:ok, locale}` or
 
   * `{:error, exception}`. A session without a locale returns a
-    `Localize.UnknownLocaleError` with a `nil` `:locale_id`.
+    `Localize.Plug.NoSessionLocaleError`.
 
   ### Examples
 
@@ -62,7 +70,7 @@ defmodule Localize.Plug do
   end
 
   def put_locale_from_session(_session, _options) do
-    {:error, Localize.UnknownLocaleError.exception(locale_id: nil)}
+    {:error, %NoSessionLocaleError{}}
   end
 
   # A locale that Gettext has no translations for is a configuration
