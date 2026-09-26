@@ -51,8 +51,9 @@ defmodule LocalizeWebTest do
     assert Localize.Plug.PutLocale.locale_from_host(nil) == nil
   end
 
-  test "put_locale_from_session returns error when no locale in session" do
-    assert {:error, _} = Localize.Plug.put_locale_from_session(%{})
+  test "put_locale_from_session returns an UnknownLocaleError struct for an empty session" do
+    assert {:error, %Localize.UnknownLocaleError{locale_id: nil}} =
+             Localize.Plug.put_locale_from_session(%{})
   end
 
   test "Phoenix.HTML.Safe protocol for Localize.LanguageTag" do
