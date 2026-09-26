@@ -70,6 +70,13 @@ defmodule Localize.Routes.Test do
       assert MyApp.Router.LocalizedHelpers.page_path(%Plug.Conn{}, :show, 1) == "/pages_fr/1"
     end
 
+    test "localized path helper under :ja, which has no routes, renders the default locale's (:en) path" do
+      Localize.put_locale(:ja)
+
+      assert MyApp.Router.LocalizedHelpers.user_face_path(%Plug.Conn{}, :index, 1) ==
+               "/users/1/face"
+    end
+
     test "localized path helper with configured :as" do
       Localize.put_locale(:fr)
       assert MyApp.Router.LocalizedHelpers.chap_path(%Plug.Conn{}, :show, 1) == "/chapters_fr/1"

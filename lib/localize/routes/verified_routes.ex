@@ -21,11 +21,14 @@ defmodule Localize.VerifiedRoutes do
   The `~q` sigil generates a `case` statement that dispatches to the appropriate localized `~p` route based on the current locale:
 
       # ~q"/users" generates:
-      case Localize.get_locale().cldr_locale_id do
+      case Localize.Routes.route_locale(Localize.get_locale(), [:de, :en, :fr]).cldr_locale_id do
         :de -> ~p"/benutzer"
         :en -> ~p"/users"
         :fr -> ~p"/utilisateurs"
       end
+
+  A locale without localized routes, for example a supported locale that
+  has no Gettext translations, gets the route of the default locale.
 
   ### Locale Interpolation
 
@@ -105,17 +108,7 @@ defmodule Localize.VerifiedRoutes do
 
   """
   defmacro sigil_q({:<<>>, _meta, _segments} = route, flags) do
-    gettext = Module.get_attribute(__CALLER__.module, :_localize_gettext_backend)
-    locale_ids = Localize.Routes.locales_from_gettext(gettext)
-
-    case_clauses =
-      Localize.VerifiedRoutes.sigil_q_case_clauses(route, flags, locale_ids, gettext)
-
-    quote location: :keep do
-      case Localize.get_locale().cldr_locale_id do
-        unquote(case_clauses)
-      end
-    end
+    locale_case(quote(do: Localize.get_locale()), route, flags, __CALLER__)
   end
 
   @doc """
@@ -187,8 +180,11 @@ defmodule Localize.VerifiedRoutes do
 
   ### Arguments
 
-  * `locale` is any locale id configured in the gettext backend. May be a
-    literal atom or a runtime expression.
+  * `locale` is a locale id (atom or string) or a `t:Localize.LanguageTag.t/0`,
+    as a literal or a runtime expression. It is resolved like
+    `Localize.validate_locale/1`, so with `de-CH` configured, `:de` and
+    `"de-CH"` both select the German route. A locale without localized
+    routes gets the route of the default locale.
 
   * `route` is a string literal route (with optional `#{...}` interpolations),
     as accepted by `sigil_q/2`.
@@ -205,18 +201,7 @@ defmodule Localize.VerifiedRoutes do
 
   '''
   defmacro path_for(locale, route) do
-    gettext = Module.get_attribute(__CALLER__.module, :_localize_gettext_backend)
-    locale_ids = Localize.Routes.locales_from_gettext(gettext)
-    route_ast = Localize.VerifiedRoutes.normalize_route_ast(route)
-
-    case_clauses =
-      Localize.VerifiedRoutes.sigil_q_case_clauses(route_ast, [], locale_ids, gettext)
-
-    quote location: :keep do
-      case unquote(locale) do
-        unquote(case_clauses)
-      end
-    end
+    locale_case(locale, normalize_route_ast(route), [], __CALLER__)
   end
 
   @doc ~S'''
@@ -226,27 +211,29 @@ defmodule Localize.VerifiedRoutes do
 
   ### Arguments
 
-  * `locale` is any locale id configured in the gettext backend.
+  * `locale` is a locale as accepted by `path_for/2`.
 
   * `route` is a string literal route accepted by `sigil_q/2`.
 
   '''
   defmacro url_for(locale, route) do
-    gettext = Module.get_attribute(__CALLER__.module, :_localize_gettext_backend)
+    locale
+    |> locale_case(normalize_route_ast(route), [], __CALLER__)
+    |> wrap_sigil_p_in_url()
+  end
+
+  # Dispatches to the translated `~p` route of the locale that serves
+  # `locale`, as chosen by `Localize.Routes.route_locale/2`.
+  defp locale_case(locale, route, flags, caller) do
+    gettext = Module.get_attribute(caller.module, :_localize_gettext_backend)
     locale_ids = Localize.Routes.locales_from_gettext(gettext)
-    route_ast = Localize.VerifiedRoutes.normalize_route_ast(route)
+    case_clauses = sigil_q_case_clauses(route, flags, locale_ids, gettext)
 
-    case_clauses =
-      Localize.VerifiedRoutes.sigil_q_case_clauses(route_ast, [], locale_ids, gettext)
-
-    case_expr =
-      quote location: :keep do
-        case unquote(locale) do
-          unquote(case_clauses)
-        end
+    quote location: :keep do
+      case Localize.Routes.route_locale(unquote(locale), unquote(locale_ids)).cldr_locale_id do
+        unquote(case_clauses)
       end
-
-    wrap_sigil_p_in_url(case_expr)
+    end
   end
 
   @doc false

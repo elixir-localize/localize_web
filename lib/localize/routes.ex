@@ -395,6 +395,40 @@ defmodule Localize.Routes do
   end
 
   @doc false
+  # The locale whose localized routes serve `locale`: `locale` itself
+  # when routes exist for it, otherwise the default locale. A locale can
+  # be valid without routes when it is supported but has no Gettext
+  # translations, and `Localize.Plug.PutLocale` accepts such a locale.
+  def route_locale(locale, locale_ids) do
+    locale = validate_locale!(locale)
+
+    if locale.cldr_locale_id in locale_ids do
+      locale
+    else
+      default = Localize.default_locale()
+
+      if default.cldr_locale_id in locale_ids do
+        default
+      else
+        raise ArgumentError,
+              "No localized routes for #{inspect(locale.cldr_locale_id)} or for the " <>
+                "default locale #{inspect(default.cldr_locale_id)}. " <>
+                "Localized routes exist for #{inspect(locale_ids)}"
+      end
+    end
+  end
+
+  defp validate_locale!(%Localize.LanguageTag{cldr_locale_id: id} = locale) when not is_nil(id),
+    do: locale
+
+  defp validate_locale!(locale) do
+    case Localize.validate_locale(locale) do
+      {:ok, locale} -> locale
+      {:error, exception} -> raise exception
+    end
+  end
+
+  @doc false
   def interpolate_and_translate_path(path, locale, gettext_backend) do
     {:ok, gettext_locale} = Localize.Locale.gettext_locale_id(locale, gettext_backend)
 
