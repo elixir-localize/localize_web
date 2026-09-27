@@ -43,9 +43,7 @@ pipeline :browser do
   plug :accepts, ["html"]
   plug :fetch_session
 
-  plug Localize.Plug.PutLocale,
-    from: [:session, :accept_language, :query, :path],
-    gettext: MyApp.Gettext
+  plug Localize.Plug.PutLocale, gettext: MyApp.Gettext
 
   plug Localize.Plug.PutSession
 end

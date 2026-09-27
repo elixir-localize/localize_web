@@ -11,7 +11,7 @@ defmodule Localize.Plug.PutLocaleTest do
   describe "init/1" do
     test "default options" do
       options = PutLocale.init([])
-      assert options[:from] == [:session, :accept_language, :query, :path, :route]
+      assert options[:from] == [:route, :path, :query, :session, :accept_language]
       assert options[:param] == "locale"
       assert options[:gettext] == []
       # Default is deferred to request time to avoid loading CLDR data
@@ -310,6 +310,51 @@ defmodule Localize.Plug.PutLocaleTest do
 
       locale = conn.private[:localize_locale]
       assert locale.cldr_locale_id == :de
+    end
+
+    test "with the default order a query locale wins over the session and accept-language" do
+      conn =
+        :get
+        |> conn("/?locale=fr")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{PutLocale.session_key() => "ja"})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :fr
+    end
+
+    test "with the default order a route locale wins over the session and accept-language" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_private(:localize_locale, "fr")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{PutLocale.session_key() => "ja"})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :fr
+    end
+
+    test "with the default order the session wins over accept-language" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{PutLocale.session_key() => "ja"})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :ja
+    end
+
+    test "with the default order accept-language applies when nothing else is set" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :de
     end
 
     test "falls through to next source when first has no locale" do

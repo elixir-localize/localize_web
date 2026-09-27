@@ -71,7 +71,7 @@ pipeline :browser do
   plug :accepts, ["html"]
   plug :fetch_session
   plug Localize.Plug.PutLocale,
-    from: [:session, :accept_language, :query, :path],
+    from: [:route, :path, :query, :session, :accept_language],
     param: "locale",
     gettext: MyAppWeb.Gettext
   plug Localize.Plug.PutSession
@@ -82,12 +82,19 @@ The Localize process locale is always set via `Localize.put_locale/1`. When a `:
 
 ### How Source Priority Works
 
-The `:from` option controls the order of locale source lookup. In this example:
+The `:from` option controls the order of locale source lookup. The example shows the default order, which applies when `:from` is omitted:
 
-1. The session is checked first (preserving the user's previous choice).
-2. The accept-language header is checked next.
+1. The locale of a localized route (e.g. `/fr/utilisateurs`) is checked first.
+
+2. Then path parameters (e.g. `/:locale/users`).
+
 3. Then query parameters (e.g. `?locale=fr`).
-4. Finally, path parameters.
+
+4. Then the session, which preserves the user's previous choice on pages whose URL carries no locale.
+
+5. Finally, the accept-language header, which gives first-time visitors a sensible default.
+
+A locale in the URL is an explicit choice, so it wins over the session and the browser. Put `:session` or `:accept_language` earlier only if a stored preference should override the URL.
 
 The first source that yields a valid locale wins. Remaining sources are not consulted.
 

@@ -2,7 +2,7 @@ defmodule Localize.Plug.PutLocale do
   @private_key :localize_locale
   @session_key "localize_locale"
 
-  @default_from [:session, :accept_language, :query, :path, :route]
+  @default_from [:route, :path, :query, :session, :accept_language]
   @default_param_name "locale"
 
   @moduledoc """
@@ -16,7 +16,7 @@ defmodule Localize.Plug.PutLocale do
 
   ### Options
 
-  * `:from` is a list specifying where in the request to look for the locale. The default is `#{inspect(@default_from)}`. The valid options are:
+  * `:from` is a list specifying where in the request to look for the locale. The default is `#{inspect(@default_from)}`: a locale in the URL is an explicit choice, so it wins over the session, which in turn wins over the browser's `accept-language` header. The valid options are:
 
     * `:accept_language` will parse the `accept-language` header and find the best matched configured locale.
 
