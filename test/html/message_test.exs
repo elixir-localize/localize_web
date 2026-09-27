@@ -133,26 +133,32 @@ defmodule Localize.HTML.Message.Test do
   end
 
   describe "unknown markup" do
-    test "raises a descriptive error" do
-      assert_raise Localize.HTML.Message.UnknownMarkupError,
-                   ~r/unknown MF2 markup tag "weird"/,
-                   fn ->
-                     render("Hello {#weird}there{/weird}")
-                   end
+    test "returns a descriptive error" do
+      assert {:error, %Message.UnknownMarkupError{} = error} =
+               Message.render_to_safe("Hello {#weird}there{/weird}", %{})
+
+      assert Exception.message(error) =~ ~s(unknown MF2 markup tag "weird")
     end
   end
 
   describe "format errors" do
-    test "raises on invalid MF2 syntax" do
-      assert_raise Localize.ParseError, fn ->
-        render("Hello {unclosed")
-      end
+    test "returns an error for invalid MF2 syntax" do
+      assert {:error, %Localize.ParseError{}} = Message.render_to_safe("Hello {unclosed", %{})
     end
 
-    test "raises on unbalanced markup" do
-      assert_raise Localize.FormatError, fn ->
-        render("{#bold}oops")
+    test "returns an error for unbalanced markup" do
+      assert {:error, %Localize.FormatError{}} = Message.render_to_safe("{#bold}oops", %{})
+    end
+
+    test "returns an error for a msgid, components or options of the wrong type" do
+      for msgid <- [nil, 42, %{}, :atom] do
+        assert {:error, %Localize.InvalidValueError{}} = Message.render_to_safe(msgid, %{})
       end
+
+      assert {:error, %Localize.InvalidValueError{}} =
+               Message.render_to_safe("Hi", %{}, components: [:not_a_map])
+
+      assert {:error, %Localize.InvalidValueError{}} = Message.render_to_safe("Hi", %{}, 42)
     end
   end
 
@@ -180,6 +186,43 @@ defmodule Localize.HTML.Message.Test do
         """)
 
       assert html == "Read the <strong>terms</strong>"
+    end
+
+    @tag :capture_log
+    test "renders the children of an unknown markup tag" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <Localize.HTML.Message.message msgid="Hello {#weird}there{/weird}" />
+        """)
+
+      assert html == "Hello there"
+    end
+
+    test "logs an unknown markup tag" do
+      assigns = %{}
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          rendered_to_string(~H"""
+          <Localize.HTML.Message.message msgid="Hello {#weird}there{/weird}" />
+          """)
+        end)
+
+      assert log =~ ~s(unknown MF2 markup tag "weird")
+    end
+
+    @tag :capture_log
+    test "renders the escaped source of a message that cannot be formatted" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <Localize.HTML.Message.message msgid="<b>Hello {unclosed" />
+        """)
+
+      assert html == "&lt;b&gt;Hello {unclosed"
     end
 
     test "facade Localize.HTML.message/1 works as a component" do

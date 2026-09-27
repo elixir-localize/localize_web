@@ -16,7 +16,7 @@ defmodule Localize.AcceptLanguage do
 
   ### Returns
 
-  * A list of `{quality, language_tag_string}` tuples.
+  * A list of `{quality, language_tag_string}` tuples. A `header` that is not a string has no tags.
 
   ### Examples
 
@@ -24,7 +24,7 @@ defmodule Localize.AcceptLanguage do
       [{1.0, "en-us"}, {0.9, "en"}, {0.8, "fr"}]
 
   """
-  @spec tokenize(String.t()) :: [{float(), String.t()}]
+  @spec tokenize(term()) :: [{float(), String.t()}]
   def tokenize(header) when is_binary(header) do
     header
     |> String.downcase()
@@ -39,6 +39,8 @@ defmodule Localize.AcceptLanguage do
     |> Enum.sort_by(fn {quality, _tag} -> quality end, :desc)
   end
 
+  def tokenize(_header), do: []
+
   @doc """
   Parses an `Accept-Language` header and validates each language tag
   against known locales.
@@ -50,7 +52,9 @@ defmodule Localize.AcceptLanguage do
   ### Returns
 
   * `{:ok, [{quality, result}]}` where `result` is either
-    `{:ok, Localize.LanguageTag.t()}` or `{:error, reason}`.
+    `{:ok, Localize.LanguageTag.t()}` or `{:error, reason}`, or
+
+  * `{:error, exception}` when `header` is not a string.
 
   ### Examples
 
@@ -59,8 +63,9 @@ defmodule Localize.AcceptLanguage do
       2
 
   """
-  @spec parse(String.t()) ::
+  @spec parse(term()) ::
           {:ok, [{float(), {:ok, Localize.LanguageTag.t()} | {:error, term()}}]}
+          | {:error, Exception.t()}
   def parse(header) when is_binary(header) do
     results =
       header
@@ -71,6 +76,8 @@ defmodule Localize.AcceptLanguage do
 
     {:ok, results}
   end
+
+  def parse(header), do: {:error, invalid_header(header)}
 
   @doc """
   Returns the best matching locale for the given `Accept-Language` header.
@@ -88,7 +95,7 @@ defmodule Localize.AcceptLanguage do
 
   * `{:ok, Localize.LanguageTag.t()}` or
 
-  * `{:error, Localize.NoMatchingLocaleError.t()}`
+  * `{:error, exception}`: a `Localize.UnknownLocaleError` when no tag matches a supported locale, or a `Localize.InvalidValueError` when `header` is not a string.
 
   ### Examples
 
@@ -97,7 +104,7 @@ defmodule Localize.AcceptLanguage do
       "en"
 
   """
-  @spec best_match(String.t()) ::
+  @spec best_match(term()) ::
           {:ok, Localize.LanguageTag.t()} | {:error, Exception.t()}
   def best_match(header) when is_binary(header) do
     result =
@@ -112,6 +119,15 @@ defmodule Localize.AcceptLanguage do
       nil ->
         {:error, Localize.UnknownLocaleError.exception(locale_id: header)}
     end
+  end
+
+  def best_match(header), do: {:error, invalid_header(header)}
+
+  defp invalid_header(header) do
+    Localize.InvalidValueError.exception(
+      value: header,
+      expected: "an Accept-Language header string"
+    )
   end
 
   # `Localize.validate_locale/1` never rejects a valid tag: with no close

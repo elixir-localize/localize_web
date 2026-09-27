@@ -263,10 +263,7 @@ In LiveView, the HTTP plug pipeline runs only on the initial page load. For subs
 ```elixir
 defmodule MyAppWeb.LocaleLive do
   def on_mount(:default, _params, session, socket) do
-    {:ok, _locale} = Localize.Plug.put_locale_from_session(
-      session,
-      gettext: MyAppWeb.Gettext
-    )
+    _ = Localize.Plug.put_locale_from_session(session, gettext: MyAppWeb.Gettext)
     {:cont, socket}
   end
 end
@@ -282,7 +279,7 @@ live_session :default, on_mount: [MyAppWeb.LocaleLive] do
 end
 ```
 
-The `put_locale_from_session/2` function reads the locale from the session (stored by `Localize.Plug.PutSession`) and sets it for both Localize and Gettext in the LiveView process.
+The `put_locale_from_session/2` function reads the locale from the session (stored by `Localize.Plug.PutSession`) and sets it for both Localize and Gettext in the LiveView process. Its result is not matched on: a first visit has no locale in the session, which returns `{:error, %Localize.Plug.NoSessionLocaleError{}}`, and the process keeps the default locale.
 
 ### Localized live routes
 

@@ -39,8 +39,12 @@ if Code.ensure_loaded?(Phoenix.Component) do
     value is already rendered and HTML-escaped — wrap or ignore it,
     but do not pass it through `Phoenix.HTML.html_escape/1` again.
 
-    Unknown markup names raise `Localize.HTML.Message.UnknownMarkupError`
-    at render time.
+    The component never raises, since a message is rendered on every
+    page that shows it. An unknown markup name logs a warning and renders
+    the tag's children without it. A message that cannot be formatted,
+    such as one with invalid MF2 syntax or unbalanced markup, logs a
+    warning and renders its source text, escaped. `render_to_safe/3`
+    returns `{:error, exception}` in both cases instead.
 
     ## Bindings and locale
 
@@ -100,12 +104,20 @@ if Code.ensure_loaded?(Phoenix.Component) do
 
     def message(assigns) do
       outputs =
-        walk_outputs(
-          assigns.msgid,
-          assigns.bindings,
-          assigns.locale,
-          assigns.components
-        )
+        case walk_outputs(
+               assigns.msgid,
+               assigns.bindings,
+               assigns.locale,
+               assigns.components,
+               :lenient
+             ) do
+          {:ok, outputs} ->
+            outputs
+
+          {:error, exception} ->
+            log_render_error(exception, assigns.msgid)
+            [HTML.html_escape(source_text(assigns.msgid))]
+        end
 
       assigns = assign(assigns, :__outputs, outputs)
 
@@ -120,54 +132,154 @@ if Code.ensure_loaded?(Phoenix.Component) do
     composing rendered messages into Phoenix.HTML pipelines.
 
     Accepts the same options as the component, passed as a keyword list.
-    """
-    @spec render_to_safe(String.t(), map() | keyword(), keyword()) :: HTML.safe()
-    def render_to_safe(msgid, bindings, options \\ []) do
-      outputs =
-        walk_outputs(
-          msgid,
-          bindings,
-          Keyword.get(options, :locale),
-          Keyword.get(options, :components, %{})
-        )
 
-      {:safe, Enum.map(outputs, &HTML.Safe.to_iodata/1)}
+    ### Returns
+
+    * A `t:Phoenix.HTML.safe/0` value, or
+
+    * `{:error, exception}` when the message cannot be formatted or uses
+      an unknown markup name (`Localize.HTML.Message.UnknownMarkupError`).
+    """
+    @spec render_to_safe(String.t(), map() | keyword(), keyword()) ::
+            HTML.safe() | {:error, Exception.t()}
+    def render_to_safe(msgid, bindings, options \\ []) do
+      with {:ok, options} <- keyword_options(options),
+           {:ok, outputs} <-
+             walk_outputs(
+               msgid,
+               bindings,
+               Keyword.get(options, :locale),
+               Keyword.get(options, :components, %{}),
+               :strict
+             ) do
+        {:safe, Enum.map(outputs, &HTML.Safe.to_iodata/1)}
+      end
     end
 
-    defp walk_outputs(msgid, bindings, locale, per_call_components) do
-      components = resolve_components(per_call_components)
+    defp keyword_options(options) do
+      if Keyword.keyword?(options), do: {:ok, options}, else: invalid_options(options)
+    end
 
+    @doc false
+    # The render path of `Localize.HTML.t/2`, which must not raise: an
+    # unknown markup name renders its children, and a message that cannot
+    # be rendered logs a warning and renders its source text, escaped.
+    def render_to_safe_or_source(msgid, bindings, options) do
+      result =
+        with {:ok, options} <- keyword_options(options) do
+          walk_outputs(
+            msgid,
+            bindings,
+            Keyword.get(options, :locale),
+            Keyword.get(options, :components, %{}),
+            :lenient
+          )
+        end
+
+      case result do
+        {:ok, outputs} ->
+          {:safe, Enum.map(outputs, &HTML.Safe.to_iodata/1)}
+
+        {:error, exception} ->
+          log_render_error(exception, msgid)
+          HTML.html_escape(source_text(msgid))
+      end
+    end
+
+    defp invalid_options(options) do
+      {:error,
+       Localize.InvalidValueError.exception(value: options, expected: "a keyword list of options")}
+    end
+
+    defp walk_outputs(msgid, bindings, locale, per_call_components, mode) do
       format_options =
         [locale: locale]
         |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
-      case Localize.Message.format_to_safe_list(msgid, bindings, format_options) do
-        {:ok, nodes} -> Enum.map(nodes, &walk_node(&1, components))
-        {:error, exception} -> raise exception
+      with {:ok, components} <- resolve_components(per_call_components),
+           {:ok, nodes} <- format(msgid, bindings, format_options) do
+        walk_nodes(nodes, components, mode)
+      end
+    end
+
+    # `Localize.Message.format_to_safe_list/3` in Localize 1.3.0 raises for
+    # bindings that are neither a map nor a keyword list. This is fixed on
+    # Localize main; once that is on hex and required here, the bindings
+    # check can go. See TODO.md.
+    defp format(msgid, bindings, options) when is_binary(msgid) do
+      if is_map(bindings) or (is_list(bindings) and Keyword.keyword?(bindings)) do
+        Localize.Message.format_to_safe_list(msgid, bindings, options)
+      else
+        {:error,
+         Localize.InvalidValueError.exception(
+           value: bindings,
+           expected: "a map or keyword list of bindings"
+         )}
+      end
+    end
+
+    defp format(msgid, _bindings, _options) do
+      {:error,
+       Localize.InvalidValueError.exception(value: msgid, expected: "an MF2 message string")}
+    end
+
+    defp walk_nodes(nodes, components, mode) do
+      nodes
+      |> Enum.reduce_while([], fn node, acc ->
+        case walk_node(node, components, mode) do
+          {:ok, output} -> {:cont, [output | acc]}
+          {:error, exception} -> {:halt, {:error, exception}}
+        end
+      end)
+      |> case do
+        {:error, exception} -> {:error, exception}
+        outputs -> {:ok, Enum.reverse(outputs)}
       end
     end
 
     # Walk a tree node into a Safe value suitable for HEEx interpolation:
     # either a `Phoenix.LiveView.Rendered.t()` (preferred) or
     # `{:safe, iodata}`. Text nodes are HTML-escaped; markup nodes are
-    # dispatched to a renderer.
-    defp walk_node({:text, text}, _components) do
-      HTML.html_escape(text)
+    # dispatched to a renderer. In `:lenient` mode an unknown markup name
+    # renders its children; in `:strict` mode it is an error.
+    defp walk_node({:text, text}, _components, _mode) do
+      {:ok, HTML.html_escape(text)}
     end
 
-    defp walk_node({:markup, name, attrs, children}, components) do
-      case Map.fetch(components, name) do
-        {:ok, renderer} ->
-          rendered_children =
-            children
-            |> Enum.map(&walk_node(&1, components))
-            |> safe_concat()
+    defp walk_node({:markup, name, attrs, children}, components, mode) do
+      with {:ok, rendered_children} <- walk_nodes(children, components, mode) do
+        children = safe_concat(rendered_children)
 
-          renderer.(%{attrs: attrs, children: rendered_children})
+        case {Map.fetch(components, name), mode} do
+          {{:ok, renderer}, _mode} ->
+            {:ok, renderer.(%{attrs: attrs, children: children})}
 
-        :error ->
-          raise UnknownMarkupError, tag: name, known: components |> Map.keys() |> Enum.sort()
+          {:error, :lenient} ->
+            log_render_error(unknown_markup(name, components), nil)
+            {:ok, children}
+
+          {:error, :strict} ->
+            {:error, unknown_markup(name, components)}
+        end
       end
+    end
+
+    defp unknown_markup(name, components) do
+      UnknownMarkupError.exception(tag: name, known: components |> Map.keys() |> Enum.sort())
+    end
+
+    defp source_text(msgid) when is_binary(msgid), do: msgid
+    defp source_text(_msgid), do: ""
+
+    defp log_render_error(exception, msgid) do
+      require Logger
+
+      message =
+        if msgid,
+          do: "#{Exception.message(exception)} in message #{inspect(msgid)}",
+          else: Exception.message(exception)
+
+      Logger.warning("Localize.HTML.Message: " <> message)
     end
 
     # Concatenate a list of mixed Rendered/{:safe, iodata} values into
@@ -178,15 +290,24 @@ if Code.ensure_loaded?(Phoenix.Component) do
       {:safe, iodata}
     end
 
-    defp resolve_components(per_call) do
+    defp resolve_components(per_call) when is_map(per_call) do
       app_components =
         :localize_web
         |> Application.get_env(:mf2_markup, [])
         |> Keyword.get(:components, %{})
 
-      default_components()
-      |> Map.merge(app_components)
-      |> Map.merge(per_call)
+      {:ok,
+       default_components()
+       |> Map.merge(app_components)
+       |> Map.merge(per_call)}
+    end
+
+    defp resolve_components(per_call) do
+      {:error,
+       Localize.InvalidValueError.exception(
+         value: per_call,
+         expected: "a map of markup names to renderer functions"
+       )}
     end
 
     @doc """

@@ -15,6 +15,12 @@ defmodule Localize.HTML.TMacroTest do
       """
     end
 
+    def unknown_markup(assigns) do
+      ~H"""
+      <p>{t("Hello {#weird}there{/weird}")}</p>
+      """
+    end
+
     def with_var(assigns) do
       ~H"""
       <p>{t("Hello, #{@name}!")}</p>
@@ -143,6 +149,15 @@ defmodule Localize.HTML.TMacroTest do
         end
 
       assert Exception.message(error) =~ "requires a string literal"
+    end
+  end
+
+  describe "a message that cannot be fully rendered" do
+    import Phoenix.LiveViewTest, only: [rendered_to_string: 1]
+
+    @tag :capture_log
+    test "an unknown markup tag renders its children rather than raising" do
+      assert rendered_to_string(Fixture.unknown_markup(%{})) == "<p>Hello there</p>"
     end
   end
 end

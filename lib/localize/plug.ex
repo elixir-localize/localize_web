@@ -46,9 +46,10 @@ defmodule Localize.Plug do
       iex> Localize.Plug.put_locale_from_session(session, gettext: MyApp.Gettext)
       iex> Localize.Plug.put_locale_from_session(session, gettext: [MyApp.Gettext, MyOtherApp.Gettext])
 
-      # In a LiveView
+      # In a LiveView. A first visit has no locale in the session, so the
+      # result is not matched on.
       def on_mount(:default, _params, session, socket) do
-        {:ok, locale} = Localize.Plug.put_locale_from_session(session, gettext: MyApp.Gettext)
+        _ = Localize.Plug.put_locale_from_session(session, gettext: MyApp.Gettext)
         {:cont, socket}
       end
 
@@ -59,9 +60,8 @@ defmodule Localize.Plug do
   def put_locale_from_session(session, options \\ [])
 
   def put_locale_from_session(%{@session_key => locale}, options) do
-    gettext_backends = normalize_gettext_backends(Keyword.get(options, :gettext, []))
-
-    with {:ok, locale} <- Localize.validate_locale(locale) do
+    with {:ok, gettext_backends} <- gettext_backends(options),
+         {:ok, locale} <- Localize.validate_locale(locale) do
       Localize.put_locale(locale)
       Enum.each(gettext_backends, &put_gettext_locale(&1, locale))
 
@@ -92,7 +92,27 @@ defmodule Localize.Plug do
     end
   end
 
-  defp normalize_gettext_backends(nil), do: []
-  defp normalize_gettext_backends(backend) when is_atom(backend), do: [backend]
-  defp normalize_gettext_backends(backends) when is_list(backends), do: backends
+  defp gettext_backends(options) do
+    if Keyword.keyword?(options) do
+      options
+      |> Keyword.get(:gettext, [])
+      |> List.wrap()
+      |> Enum.find(&(not gettext_backend?(&1)))
+      |> case do
+        nil -> {:ok, List.wrap(Keyword.get(options, :gettext, []))}
+        backend -> invalid_value(backend, "a Gettext backend module")
+      end
+    else
+      invalid_value(options, "a keyword list of options")
+    end
+  end
+
+  defp gettext_backend?(backend) do
+    is_atom(backend) and Code.ensure_loaded?(backend) and
+      function_exported?(backend, :__gettext__, 1)
+  end
+
+  defp invalid_value(value, expected) do
+    {:error, Localize.InvalidValueError.exception(value: value, expected: expected)}
+  end
 end

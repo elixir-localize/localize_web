@@ -23,7 +23,19 @@ defmodule Localize.HTML.Locale do
 
   @type mapper :: (locale() -> String.t())
 
+  alias Localize.HTML.Options
+
   @identity :identity
+
+  @omit_from_select_options [
+    :locales,
+    :locale,
+    :mapper,
+    :collator,
+    :add_likely_subtags,
+    :prefer,
+    :compound_locale
+  ]
 
   @dont_include_default [:"en-001", :root, :und]
 
@@ -56,6 +68,8 @@ defmodule Localize.HTML.Locale do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
+  * `{:error, exception}` when an option is invalid.
+
   ### Examples
 
       iex> Localize.HTML.Locale.select(:my_form, :locale_list, selected: "en")
@@ -68,10 +82,22 @@ defmodule Localize.HTML.Locale do
         ) ::
           Phoenix.HTML.safe() | {:error, Exception.t()}
 
-  def select(form, field, options \\ [])
+  def select(form, field, options \\ []) do
+    case validate_options(options) do
+      {:ok, %{locale: locale} = options} ->
+        select_options =
+          options
+          |> Map.drop(@omit_from_select_options)
+          |> Map.to_list()
 
-  def select(form, field, options) when is_list(options) do
-    select(form, field, validate_options(options), options[:selected])
+        options = build_locale_options(options)
+        {options, select_options} = add_lang_attribute(locale, options, select_options)
+
+        PhoenixHTMLHelpers.Form.select(form, field, options, select_options)
+
+      {:error, exception} ->
+        {:error, exception}
+    end
   end
 
   @doc """
@@ -87,43 +113,17 @@ defmodule Localize.HTML.Locale do
 
   ### Returns
 
-  * A list of `{display_name, locale_string}` tuples.
+  * A list of `{display_name, locale_string}` tuples, or
+
+  * `{:error, exception}` when an option is invalid.
 
   """
-  @spec locale_options(select_options) :: list(tuple())
+  @spec locale_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 
-  def locale_options(options \\ [])
-
-  def locale_options(options) when is_list(options) do
-    options
-    |> validate_options()
-    |> build_locale_options()
-  end
-
-  defp select(_form, _field, {:error, reason}, _selected) do
-    {:error, reason}
-  end
-
-  @omit_from_select_options [
-    :locales,
-    :locale,
-    :mapper,
-    :collator,
-    :add_likely_subtags,
-    :prefer,
-    :compound_locale
-  ]
-
-  defp select(form, field, %{locale: locale} = options, _selected) do
-    select_options =
-      options
-      |> Map.drop(@omit_from_select_options)
-      |> Map.to_list()
-
-    options = build_locale_options(options)
-    {options, select_options} = add_lang_attribute(locale, options, select_options)
-
-    PhoenixHTMLHelpers.Form.select(form, field, options, select_options)
+  def locale_options(options \\ []) do
+    with {:ok, options} <- validate_options(options) do
+      build_locale_options(options)
+    end
   end
 
   defp add_lang_attribute(@identity, options, select_options) do
@@ -136,19 +136,18 @@ defmodule Localize.HTML.Locale do
   end
 
   defp validate_options(options) do
-    options = Map.new(options)
-
-    with options <- Map.merge(default_options(), options),
-         {:ok, options} <- validate_locale(options.locale, options),
-         {:ok, options} <- validate_selected(options.selected, options),
-         {:ok, options} <- validate_locales(options.locales, options),
-         {:ok, options} <- validate_identity_locales(options.locale, options) do
-      options
+    with {:ok, options} <- Options.merge(options, default_options()),
+         {:ok, options} <- validate_display_locale(options),
+         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.function(options, :mapper),
+         {:ok, options} <- Options.optional(options, :selected, &validate_locale/1),
+         {:ok, options} <- default_locales(options) do
+      Options.list(options, :locales, &validate_locale/1)
     end
   end
 
   defp default_options do
-    Map.new(
+    %{
       locales: nil,
       locale: Localize.get_locale(),
       collator: &default_collator/1,
@@ -157,68 +156,27 @@ defmodule Localize.HTML.Locale do
       add_likely_subtags: false,
       compound_locale: false,
       prefer: :default
-    )
+    }
   end
 
   defp default_collator(locales) do
     Enum.sort(locales, &(&1.display_name < &2.display_name))
   end
 
-  defp validate_selected(nil, options) do
-    {:ok, options}
+  # `:identity` renders each locale in itself; any other value is the
+  # locale the display names are rendered in.
+  defp validate_display_locale(%{locale: @identity} = options), do: {:ok, options}
+  defp validate_display_locale(options), do: Options.locale(options)
+
+  defp default_locales(%{locales: nil} = options) do
+    {:ok, Map.put(options, :locales, Localize.all_locale_ids() -- @dont_include_default)}
   end
 
-  defp validate_selected(selected, options) do
-    case Localize.validate_locale(to_string(selected)) do
-      {:ok, locale} -> {:ok, Map.put(options, :selected, locale)}
-      {:error, reason} -> {:error, reason}
-    end
-  end
+  defp default_locales(options), do: {:ok, options}
 
-  defp validate_locales(nil, options) do
-    default_locales = Localize.all_locale_ids() -- @dont_include_default
-    validate_locales(default_locales, options)
-  end
-
-  defp validate_locales(locales, options) when is_list(locales) do
-    Enum.reduce_while(locales, [], fn locale, acc ->
-      case Localize.validate_locale(to_string(locale)) do
-        {:ok, locale} -> {:cont, [locale | acc]}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-    |> case do
-      {:error, reason} -> {:error, reason}
-      locales -> {:ok, Map.put(options, :locales, locales)}
-    end
-  end
-
-  defp validate_identity_locales(@identity, options) do
-    Enum.reduce_while(options.locales, {:ok, options}, fn locale, acc ->
-      case Localize.validate_locale(locale) do
-        {:ok, _locale} -> {:cont, acc}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp validate_identity_locales(_locale, options) do
-    {:ok, options}
-  end
-
-  defp validate_locale(:identity, options) do
-    {:ok, options}
-  end
-
-  defp validate_locale(locale, options) do
-    with {:ok, locale} <- Localize.validate_locale(locale) do
-      options
-      |> Map.put(:locale, locale)
-      |> wrap(:ok)
-    end
-  end
-
-  defp wrap(term, atom), do: {atom, term}
+  # `Localize.validate_locale/1` returns an error for any term that is not
+  # a locale, so no type check is needed first.
+  defp validate_locale(locale), do: Localize.validate_locale(locale)
 
   defp maybe_include_selected_locale(%{selected: nil} = options) do
     options
@@ -248,24 +206,25 @@ defmodule Localize.HTML.Locale do
   end
 
   defp display_name(locale, @identity, options) do
-    options = Keyword.put(options, :locale, locale)
-    display_name = Localize.Locale.LocaleDisplay.display_name!(locale, options)
-
-    locale_string =
-      if locale.canonical_locale_id,
-        do: to_string(locale.canonical_locale_id),
-        else: to_string(locale.cldr_locale_id)
-
-    %{locale: locale_string, display_name: display_name, language_tag: locale}
+    display_name(locale, locale, options)
   end
 
-  defp display_name(locale, _in_locale, options) do
-    display_name = Localize.Locale.LocaleDisplay.display_name!(locale, options)
-
+  # CLDR has no display name for a few locales (`apc`, `skr` and others in
+  # English), so the locale code stands in for the name.
+  defp display_name(locale, in_locale, options) do
     locale_string =
       if locale.canonical_locale_id,
         do: to_string(locale.canonical_locale_id),
         else: to_string(locale.cldr_locale_id)
+
+    display_name =
+      case Localize.Locale.LocaleDisplay.display_name(
+             locale,
+             Keyword.put(options, :locale, in_locale)
+           ) do
+        {:ok, name} -> name
+        {:error, _exception} -> locale_string
+      end
 
     %{locale: locale_string, display_name: display_name, language_tag: locale}
   end

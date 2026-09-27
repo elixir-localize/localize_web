@@ -14,6 +14,8 @@ defmodule Localize.HTML.Currency do
           | {:selected, atom() | binary()}
         ]
 
+  alias Localize.HTML.Options
+
   @omit_from_select_options [:currencies, :locale, :mapper, :collator]
 
   @doc """
@@ -45,6 +47,8 @@ defmodule Localize.HTML.Currency do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
+  * `{:error, exception}` when an option is invalid.
+
   ### Examples
 
       iex> Localize.HTML.Currency.select(:my_form, :currency, selected: :USD)
@@ -58,10 +62,24 @@ defmodule Localize.HTML.Currency do
           Phoenix.HTML.safe()
           | {:error, Exception.t()}
 
-  def select(form, field, options \\ [])
+  def select(form, field, options \\ []) do
+    case validate_options(options) do
+      {:ok, options} ->
+        select_options =
+          options
+          |> Map.drop(@omit_from_select_options)
+          |> Map.to_list()
 
-  def select(form, field, options) when is_list(options) do
-    select(form, field, validate_options(options), options[:selected])
+        PhoenixHTMLHelpers.Form.select(
+          form,
+          field,
+          build_currency_options(options),
+          select_options
+        )
+
+      {:error, exception} ->
+        {:error, exception}
+    end
   end
 
   @doc """
@@ -77,98 +95,46 @@ defmodule Localize.HTML.Currency do
 
   ### Returns
 
-  * A list of `{display_name, currency_code}` tuples.
+  * A list of `{display_name, currency_code}` tuples, or
+
+  * `{:error, exception}` when an option is invalid.
 
   """
-  @spec currency_options(select_options) :: list(tuple())
+  @spec currency_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 
-  def currency_options(options \\ [])
-
-  def currency_options(options) when is_list(options) do
-    options
-    |> validate_options()
-    |> build_currency_options()
-  end
-
-  defp select(_form, _field, {:error, reason}, _selected) do
-    {:error, reason}
-  end
-
-  defp select(form, field, options, _selected) do
-    select_options =
-      options
-      |> Map.drop(@omit_from_select_options)
-      |> Map.to_list()
-
-    options = build_currency_options(options)
-
-    PhoenixHTMLHelpers.Form.select(form, field, options, select_options)
+  def currency_options(options \\ []) do
+    with {:ok, options} <- validate_options(options) do
+      build_currency_options(options)
+    end
   end
 
   defp validate_options(options) do
-    options = Map.new(options)
-
-    with options <- Map.merge(default_options(), options),
-         {:ok, options} <- validate_locale(options),
-         {:ok, options} <- validate_selected(options),
-         {:ok, options} <- validate_currencies(options) do
-      options
+    with {:ok, options} <- Options.merge(options, default_options()),
+         {:ok, options} <- Options.locale(options),
+         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.function(options, :mapper),
+         {:ok, options} <- Options.optional(options, :selected, &validate_currency/1) do
+      Options.list(options, :currencies, &validate_currency/1)
     end
   end
 
   defp default_options do
-    Map.new(
+    %{
       currencies: Localize.Currency.known_currency_codes(),
       locale: Localize.get_locale(),
       collator: &default_collator/1,
       mapper: &{to_string(&1.code) <> " - " <> to_string(&1.name), to_string(&1.code)},
       selected: nil
-    )
+    }
   end
 
   defp default_collator(currencies) do
     Enum.sort(currencies, &(&1.name < &2.name))
   end
 
-  defp validate_selected(%{selected: nil} = options) do
-    {:ok, options}
+  defp validate_currency(currency) do
+    Options.code(currency, :currency, &Localize.Currency.validate_currency/1)
   end
-
-  defp validate_selected(%{selected: selected} = options) do
-    with {:ok, currency} <- Localize.Currency.validate_currency(selected) do
-      {:ok, Map.put(options, :selected, currency)}
-    end
-  end
-
-  defp validate_currencies(%{currencies: currencies} = options) do
-    validate_currencies(currencies, options)
-  end
-
-  defp validate_currencies(currencies) when is_list(currencies) do
-    Enum.reduce_while(currencies, [], fn currency, acc ->
-      case Localize.Currency.validate_currency(currency) do
-        {:ok, currency} -> {:cont, [currency | acc]}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp validate_currencies(currencies, options) do
-    case validate_currencies(currencies) do
-      {:error, reason} -> {:error, reason}
-      currencies -> {:ok, Map.put(options, :currencies, Enum.reverse(currencies))}
-    end
-  end
-
-  defp validate_locale(options) do
-    with {:ok, locale} <- Localize.validate_locale(options[:locale]) do
-      options
-      |> Map.put(:locale, locale)
-      |> wrap(:ok)
-    end
-  end
-
-  defp wrap(term, atom), do: {atom, term}
 
   defp maybe_include_selected_currency(%{selected: nil} = options) do
     options

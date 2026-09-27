@@ -12,6 +12,8 @@ Each helper module provides two public functions:
 
 * `*_options/1` — returns a list of `{display_name, value}` tuples for use with `Phoenix.HTML.Form.options_for_select/2` or custom `<datalist>` elements.
 
+Both return `{:error, exception}` for an invalid option, such as an unknown locale, currency or style, or options that are not a keyword list. They never raise, so a bad value cannot take down the page that renders them.
+
 All helpers are also available through the `Localize.HTML` facade module with prefixed names (e.g., `Localize.HTML.territory_select/3`).
 
 ## Territory Select
@@ -24,7 +26,7 @@ iex> Localize.HTML.Territory.select(:my_form, :territory, selected: :AU)
 
 ### Options
 
-* `:territories` — a list of territory codes to include. The default is all known territories from `Localize.Territory.territory_codes/0`.
+* `:territories` — a list of territory codes to include. The default is every current country and region from `Localize.Territory.individual_territories/0`.
 
 * `:style` — the format of the territory name. Options are `:standard` (default), `:short`, and `:variant`.
 
@@ -278,7 +280,7 @@ iex> Localize.HTML.Month.select(:my_form, :month, selected: 1)
 
 * `:style` — the format of the month name. Options are `:wide` (default), `:abbreviated`, and `:narrow`.
 
-* `:calendar` — the calendar from which month names are derived. The default is `Calendar.ISO`.
+* `:calendar` — the calendar module from which month names are derived, such as `Calendrical.Hebrew`. The default is `Calendar.ISO`. A CLDR calendar type such as `:hebrew` is not a calendar module and returns an error.
 
 * `:year` — the year from which the number of months is derived. The default is the current year.
 

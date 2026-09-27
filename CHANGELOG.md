@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Plug.PutLocale` now checks `[:route, :path, :query, :session, :accept_language]` by default, so a locale in the URL wins. The previous default put `:session` and `:accept_language` first, and a URL locale never took effect in a browser; pass `:from` to restore it. Closes #25.
 
+* `Localize.HTML.Message.render_to_safe/3` returns `{:error, exception}` for a message it cannot render, where it raised. The `<.message>` component and `Localize.HTML.t/2` log a warning and render the escaped source, or the children of an unknown markup tag, rather than raising.
+
+* `Localize.HTML.Month` returns `{:error, %Localize.UnknownCalendarError{}}` for a `:calendar` that is not a calendar module, such as the CLDR type `:hebrew`, and an error for an unknown `:style`, where both were silently rendered as Gregorian `:wide` names.
+
 ### Added
 
 * `Localize.Routes.localize_live_session/3` defines one live session per locale, so a live navigation to another locale reloads the page in that locale rather than keeping the old one. A localized `live` route outside it now warns at compile time. Closes #24.
@@ -15,6 +19,10 @@ All notable changes to this project will be documented in this file. This projec
 * `Localize.Plug.PutLocale` sets a `vary` header for each request header it read to find the locale (`accept-language`, and `cookie` for `:session` and `:cookie`), so a shared cache stores one response per language. Thanks to @rubas for the PR (#21).
 
 ### Fixed
+
+* The select helpers in `Localize.HTML` return `{:error, exception}` for any invalid option — a bad `:locale`, `:selected`, list, `:style`, `:collator` or `:mapper`, or options that are not a keyword list — where 201 such inputs raised. `Localize.HTML.Territory` and `Localize.HTML.Locale` no longer raise with their default options.
+
+* `Localize.AcceptLanguage`, `Localize.Plug.put_locale_from_session/2`, the `get_locale/1` functions, `locale_from_host/1` and `hreflang_links/1` return an error or `nil` for input of the wrong type, and the LiveView `on_mount` examples no longer match on a result a first visit cannot produce.
 
 * `Localize.AcceptLanguage.best_match/1` skips a tag that matches no supported locale and tries the next one. It previously returned the requested language carrying the first supported locale's data, so `es-ES,fr-CH;q=0.9` served the first supported locale rather than French. Thanks to @rubas for the PR (#19).
 

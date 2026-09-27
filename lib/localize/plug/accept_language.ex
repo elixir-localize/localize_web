@@ -94,10 +94,9 @@ defmodule Localize.Plug.AcceptLanguage do
 
   ### Returns
 
-  * A `t:Localize.LanguageTag.t/0` or `nil`.
+  * A `t:Localize.LanguageTag.t/0`, or `nil` when no locale was set or `conn` is not a `t:Plug.Conn.t/0`.
 
   """
-  def get_locale(conn) do
-    conn.private[:localize_locale]
-  end
+  def get_locale(%Plug.Conn{private: private}), do: private[:localize_locale]
+  def get_locale(_conn), do: nil
 end

@@ -487,8 +487,10 @@ defmodule Localize.Routes.LocalizedHelpers do
   @doc """
   Generates HTML `link` tags for a given map of locale => URLs.
 
+  Anything other than a map, such as `nil`, generates no links.
+
   """
-  @spec hreflang_links(%{locale_name() => url()}) :: Phoenix.HTML.safe()
+  @spec hreflang_links(%{locale_name() => url()} | term()) :: Phoenix.HTML.safe()
   def hreflang_links(nil) do
     {:safe, []}
   end
@@ -504,6 +506,10 @@ defmodule Localize.Routes.LocalizedHelpers do
       |> Enum.intersperse(?\n)
 
     {:safe, links}
+  end
+
+  def hreflang_links(_url_map) do
+    {:safe, []}
   end
 
   @doc false

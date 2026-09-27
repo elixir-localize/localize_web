@@ -60,10 +60,12 @@ Restore the locale in your LiveView `on_mount` callback:
 
 ```elixir
 def on_mount(:default, _params, session, socket) do
-  {:ok, _locale} = Localize.Plug.put_locale_from_session(session, gettext: MyApp.Gettext)
+  _ = Localize.Plug.put_locale_from_session(session, gettext: MyApp.Gettext)
   {:cont, socket}
 end
 ```
+
+The result is not matched on: a first visit has no locale in the session, and the process keeps the default locale.
 
 Define localized live routes with `localize_live_session/3` rather than `live_session/3`. It puts each locale's routes into their own live session, so a live navigation to another locale reloads the page in that locale:
 

@@ -169,12 +169,11 @@ defmodule Localize.Plug.PutLocale do
 
   ### Returns
 
-  * A `t:Localize.LanguageTag.t/0` or `nil`.
+  * A `t:Localize.LanguageTag.t/0`, or `nil` when no locale was set or `conn` is not a `t:Plug.Conn.t/0`.
 
   """
-  def get_locale(conn) do
-    conn.private[@private_key]
-  end
+  def get_locale(%Plug.Conn{private: private}), do: private[@private_key]
+  def get_locale(_conn), do: nil
 
   @doc """
   Attempts to resolve a locale from a hostname's top-level domain.
@@ -188,9 +187,11 @@ defmodule Localize.Plug.PutLocale do
 
   ### Returns
 
-  * `{:ok, Localize.LanguageTag.t()}` or
+  * `{:ok, Localize.LanguageTag.t()}`,
 
-  * `{:error, reason}`
+  * `{:error, reason}`, or
+
+  * `nil` when the host has a generic top-level domain, one that is not a territory, or `host` is not a string.
 
   """
   def locale_from_host(nil), do: nil
@@ -216,6 +217,8 @@ defmodule Localize.Plug.PutLocale do
       end
     end
   end
+
+  def locale_from_host(_host), do: nil
 
   # Returns the locale of the first source that has one, and the sources
   # consulted to find it (all of them when none has one).

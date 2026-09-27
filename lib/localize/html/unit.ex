@@ -15,7 +15,11 @@ defmodule Localize.HTML.Unit do
           | {:style, :long | :short | :narrow}
         ]
 
+  alias Localize.HTML.Options
+
   @omit_from_select_options [:units, :locale, :mapper, :collator, :style]
+
+  @styles [:long, :short, :narrow]
 
   @doc """
   Generates an HTML select tag for a unit list that can be used with a `t:Phoenix.HTML.Form.t/0`.
@@ -48,6 +52,8 @@ defmodule Localize.HTML.Unit do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
+  * `{:error, exception}` when an option is invalid.
+
   ### Examples
 
       iex> Localize.HTML.Unit.select(:my_form, :unit, selected: :foot)
@@ -61,10 +67,19 @@ defmodule Localize.HTML.Unit do
           Phoenix.HTML.safe()
           | {:error, Exception.t()}
 
-  def select(form, field, options \\ [])
+  def select(form, field, options \\ []) do
+    case validate_options(options) do
+      {:ok, options} ->
+        select_options =
+          options
+          |> Map.drop(@omit_from_select_options)
+          |> Map.to_list()
 
-  def select(form, field, options) when is_list(options) do
-    select(form, field, validate_options(options), options[:selected])
+        PhoenixHTMLHelpers.Form.select(form, field, build_unit_options(options), select_options)
+
+      {:error, exception} ->
+        {:error, exception}
+    end
   end
 
   @doc """
@@ -80,74 +95,54 @@ defmodule Localize.HTML.Unit do
 
   ### Returns
 
-  * A list of `{display_name, unit_code}` tuples.
+  * A list of `{display_name, unit_code}` tuples, or
+
+  * `{:error, exception}` when an option is invalid.
 
   """
-  @spec unit_options(select_options) :: list(tuple())
+  @spec unit_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 
-  def unit_options(options \\ [])
-
-  def unit_options(options) when is_list(options) do
-    options
-    |> validate_options()
-    |> build_unit_options()
-  end
-
-  defp select(_form, _field, {:error, reason}, _selected) do
-    {:error, reason}
-  end
-
-  defp select(form, field, options, _selected) do
-    select_options =
-      options
-      |> Map.drop(@omit_from_select_options)
-      |> Map.to_list()
-
-    options = build_unit_options(options)
-
-    PhoenixHTMLHelpers.Form.select(form, field, options, select_options)
+  def unit_options(options \\ []) do
+    with {:ok, options} <- validate_options(options) do
+      build_unit_options(options)
+    end
   end
 
   defp validate_options(options) do
-    with options <- Map.merge(default_options(), Map.new(options)),
-         {:ok, options} <- validate_locale(options),
-         {:ok, options} <- validate_selected(options) do
-      options
+    with {:ok, options} <- Options.merge(options, default_options()),
+         {:ok, options} <- Options.locale(options),
+         {:ok, options} <- Options.one_of(options, :style, @styles),
+         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.function(options, :mapper),
+         {:ok, options} <- Options.optional(options, :selected, &validate_unit/1) do
+      Options.list(options, :units, &validate_unit/1)
     end
   end
 
   defp default_options do
-    Map.new(
+    %{
       units: default_unit_list(),
       locale: Localize.get_locale(),
       collator: &default_collator/1,
       mapper: & &1,
       style: :long,
       selected: nil
-    )
+    }
   end
 
   defp default_collator(units) do
     Enum.sort(units, fn {name_1, _}, {name_2, _} -> name_1 < name_2 end)
   end
 
-  defp validate_selected(%{selected: nil} = options) do
-    {:ok, options}
-  end
+  defp validate_unit(unit) when is_atom(unit) or is_binary(unit) do
+    unit = to_string(unit)
 
-  defp validate_selected(%{selected: selected} = options) do
-    {:ok, Map.put(options, :selected, to_string(selected))}
-  end
-
-  defp validate_locale(options) do
-    with {:ok, locale} <- Localize.validate_locale(options[:locale]) do
-      options
-      |> Map.put(:locale, locale)
-      |> wrap(:ok)
+    with {:ok, _unit} <- Localize.Unit.new(unit) do
+      {:ok, unit}
     end
   end
 
-  defp wrap(term, atom), do: {atom, term}
+  defp validate_unit(unit), do: Options.invalid(unit, :unit)
 
   defp maybe_include_selected_unit(%{selected: nil} = options) do
     options
