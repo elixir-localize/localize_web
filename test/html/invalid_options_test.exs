@@ -57,8 +57,13 @@ defmodule Localize.HTML.InvalidOptionsTest do
     assert [{_name, _code} | _] = Localize.HTML.Locale.locale_options(locale: :en)
   end
 
-  test "a locale without a display name is labelled with its code" do
-    assert [{"apc", "apc"}] = Localize.HTML.Locale.locale_options(locales: [:apc], locale: :en)
+  test "Locale lists the locales configured for Localize by default" do
+    codes =
+      Localize.HTML.Locale.locale_options(locale: :en) |> Enum.map(&elem(&1, 1)) |> Enum.sort()
+
+    configured = Localize.supported_locales() |> Enum.map(&to_string/1) |> Enum.sort()
+
+    assert codes == configured
   end
 
   test "Locale renders each locale in itself with locale: :identity" do

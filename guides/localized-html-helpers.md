@@ -179,7 +179,7 @@ iex> Localize.HTML.Locale.select(:my_form, :locale, selected: "en")
 
 ### Options
 
-* `:locales` — a list of locale identifiers to include. The default is `Localize.all_locale_ids/0` with meta locales excluded.
+* `:locales` — a list of locale identifiers to include. The default is the locales configured for Localize, `Localize.supported_locales/0`.
 
 * `:locale` — the locale used to localize display names. The default is `Localize.get_locale/0`. The special value `:identity` renders each locale's name in its own language.
 

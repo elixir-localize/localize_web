@@ -52,7 +52,7 @@ defmodule Localize.HTML.Locale do
 
   ### Options
 
-  * `:locales` defines the list of locales to be displayed in the select tag. The default is `Localize.all_locale_ids/0` with meta locales excluded.
+  * `:locales` defines the list of locales to be displayed in the select tag. The default is the locales configured for Localize, `Localize.supported_locales/0`.
 
   * `:locale` defines the locale used to localise the display names. The default is the locale returned by `Localize.get_locale/0`. If set to `:identity` then each locale in `:locales` will be rendered in its own locale.
 
@@ -169,7 +169,7 @@ defmodule Localize.HTML.Locale do
   defp validate_display_locale(options), do: Options.locale(options)
 
   defp default_locales(%{locales: nil} = options) do
-    {:ok, Map.put(options, :locales, Localize.all_locale_ids() -- @dont_include_default)}
+    {:ok, Map.put(options, :locales, Localize.supported_locales() -- @dont_include_default)}
   end
 
   defp default_locales(options), do: {:ok, options}
@@ -209,8 +209,8 @@ defmodule Localize.HTML.Locale do
     display_name(locale, locale, options)
   end
 
-  # CLDR has no display name for a few locales (`apc`, `skr` and others in
-  # English), so the locale code stands in for the name.
+  # A locale CLDR has no display name for in the display locale is
+  # labelled with its code rather than failing the whole list.
   defp display_name(locale, in_locale, options) do
     locale_string =
       if locale.canonical_locale_id,
