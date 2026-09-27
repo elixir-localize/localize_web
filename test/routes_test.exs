@@ -1,3 +1,14 @@
+defmodule Localize.Routes.Test.NestedWithOptionsRouter do
+  use MyAppWeb, :router
+  use Localize.Routes, gettext: MyApp.Gettext
+
+  localize [:fr] do
+    resources "/users", UserController, only: [:index] do
+      resources("/faces", FaceController, only: [:index])
+    end
+  end
+end
+
 defmodule Localize.Routes.Test do
   use ExUnit.Case
   import Plug.Test
@@ -179,6 +190,16 @@ defmodule Localize.Routes.Test do
       assert links == %{}
       assert header_io_data == {:safe, []}
       assert header == ""
+    end
+  end
+
+  describe "Nested resources" do
+    test "a parent with options translates the nested path" do
+      paths =
+        Localize.Routes.Test.NestedWithOptionsRouter.__routes__()
+        |> Enum.map(& &1.path)
+
+      assert paths == ["/users_fr", "/users_fr/:user_id/faces_fr"]
     end
   end
 end

@@ -289,6 +289,22 @@ defmodule Localize.Routes do
     end
   end
 
+  defmacro localize(
+             locale,
+             {:resources, _, [path, controller, options, [do: {fun, _, _}] = nested]}
+           )
+           when fun != :localize do
+    nested = localize_nested_resources(locale, nested)
+
+    quote location: :keep do
+      localize unquote(locale) do
+        resources unquote(path), unquote(controller), unquote(options) do
+          unquote(nested)
+        end
+      end
+    end
+  end
+
   # Do the actual translations - locale is {%LanguageTag{}, gettext_locale_string}
   defmacro localize({locale, gettext_locale}, {verb, meta, [path | args]})
            when verb in @localizable_verbs do
