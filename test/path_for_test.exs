@@ -50,6 +50,23 @@ defmodule PathFor.Test do
       assert path_for(:fr, "/users/:territory") == "/users_fr/fr"
     end
 
+    test "accepts a string, a regional variant and a language tag for :fr" do
+      {:ok, fr} = Localize.validate_locale("fr")
+
+      assert path_for("fr", "/users") == "/users_fr"
+      assert path_for(:"fr-CH", "/users") == "/users_fr"
+      assert path_for(fr, "/users") == "/users_fr"
+      assert path_for(Localize.LanguageTag.new!("fr-CH"), "/users") == "/users_fr"
+    end
+
+    test "renders the default locale's (:en) route for :ja, which has no routes" do
+      assert path_for(:ja, "/users/1/faces") == "/users/1/face"
+    end
+
+    test "raises for an invalid locale" do
+      assert_raise Localize.InvalidLocaleError, fn -> path_for("not a locale", "/users") end
+    end
+
     test "renders multiple locales in one template-style pass" do
       Localize.put_locale(:en)
 
@@ -68,6 +85,10 @@ defmodule PathFor.Test do
       assert url_for(:fr, "/users") == "http://localhost/users_fr"
       assert url_for(:de, "/users") == "http://localhost/users_de"
       assert url_for(:en, "/users") == "http://localhost/users"
+    end
+
+    test "renders the default locale's (:en) URL for :ja, which has no routes" do
+      assert url_for(:ja, "/users/1/faces") == "http://localhost/users/1/face"
     end
 
     test "supports interpolations" do

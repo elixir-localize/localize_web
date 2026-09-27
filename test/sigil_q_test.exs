@@ -65,6 +65,12 @@ defmodule SigilQTest do
              "http://localhost/users_de/de"
   end
 
+  test "sigil_q under :ja, which has no routes, renders the default locale's (:en) route" do
+    Localize.put_locale(:ja)
+    assert ~q[/users/1/faces] == "/users/1/face"
+    assert url(~q[/users/1/faces]) == "http://localhost/users/1/face"
+  end
+
   test "sigil_p with url/1" do
     assert url(~p[/users/us]) == "http://localhost/users/us"
     assert url(MyApp.Endpoint, ~p[/users/us]) == "http://localhost/users/us"
