@@ -142,6 +142,12 @@ defmodule Localize.Routes.Test do
       assert conn.private.localize_locale == locale
     end
 
+    test "a route with private: @page_private keeps section: :docs next to its locale fr" do
+      conn = get(build_conn(), "/fr/sections/1")
+      assert conn.private.section == :docs
+      assert conn.private.localize_locale.cldr_locale_id == :fr
+    end
+
     @endpoint MyApp.Endpoint
 
     test "hreflang link helper" do

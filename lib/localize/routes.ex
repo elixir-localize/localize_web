@@ -866,6 +866,13 @@ defmodule Localize.Routes do
     {:%{}, meta, [{key, Macro.escape(value)} | key_values]}
   end
 
+  # A map known only at runtime, such as `private: @route_private`.
+  defp put_value(map, key, value) do
+    quote do
+      Map.put(unquote(map), unquote(key), unquote(Macro.escape(value)))
+    end
+  end
+
   defp canonical_route({verb, meta, [path, controller, action | _args]}) when is_atom(action) do
     {verb, meta, [path, controller, action]}
   end

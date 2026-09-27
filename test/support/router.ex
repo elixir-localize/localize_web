@@ -72,6 +72,13 @@ defmodule MyApp.Router do
     end
   end
 
+  # Route options given as a module attribute
+  @page_private %{section: :docs}
+
+  localize [:en, :fr] do
+    get("/#{locale}/sections/:page", PageController, :show, private: @page_private)
+  end
+
   # Unlocalized route with translatable path elements
   get("/not_localized/:page", NotLocalizedController, :show)
 end
