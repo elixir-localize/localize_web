@@ -17,6 +17,7 @@ defmodule LocalizeWeb.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
       deps: deps(),
+      test_coverage: [ignore_modules: coverage_ignore_modules()],
       dialyzer: [
         plt_add_apps: ~w(gettext phoenix phoenix_live_view phoenix_html)a,
         flags: [
@@ -130,6 +131,24 @@ defmodule LocalizeWeb.MixProject do
     else
       [{:json_polyfill, "~> 0.2 or ~> 1.0"}]
     end
+  end
+
+  # Test fixtures from test/support, and the router modules Phoenix
+  # generates from them. Library code is never listed here.
+  defp coverage_ignore_modules do
+    [
+      ~r/^MyApp(Web)?\./,
+      MyAppWeb,
+      MyModule,
+      MyPlugRouter,
+      SimplePlugRouter,
+      Localize.Route.TestHelper,
+      FaceController,
+      NotLocalizedController,
+      PageController,
+      UserController,
+      VisageController
+    ]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
