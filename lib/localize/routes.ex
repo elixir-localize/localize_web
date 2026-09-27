@@ -329,6 +329,12 @@ defmodule Localize.Routes do
 
   * `:session` is a map or a `{module, function, args}` tuple, as for `Phoenix.LiveView.Router.live_session/3`. The locale of each live session is added to the session it produces.
 
+  ### Returns
+
+  * One `Phoenix.LiveView.Router.live_session/3` definition per locale known to the Gettext backend, each holding the block's routes for that locale.
+
+  * Raises `ArgumentError` at compile time when `options` is not a keyword list, or when a route in the block is not inside a `localize` block.
+
   ### Examples
 
       localize_live_session :default, on_mount: [MyAppWeb.LocaleLive] do
