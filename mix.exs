@@ -76,6 +76,7 @@ defmodule LocalizeWeb.MixProject do
       groups_for_modules: [
         Plugs: [
           Localize.Plug,
+          Localize.Plug.NoSessionLocaleError,
           Localize.Plug.PutLocale,
           Localize.Plug.PutSession,
           Localize.Plug.AcceptLanguage,
