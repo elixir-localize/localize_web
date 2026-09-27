@@ -63,8 +63,22 @@ defmodule PathFor.Test do
       assert path_for(:ja, "/users/1/faces") == "/users/1/face"
     end
 
-    test "raises for an invalid locale" do
-      assert_raise Localize.InvalidLocaleError, fn -> path_for("not a locale", "/users") end
+    test "renders the default locale's (:en) route for an invalid locale" do
+      for locale <- ["not a locale", "", :"", %{}, 42, String.duplicate("x", 5000)] do
+        assert path_for(locale, "/users/1/faces") == "/users/1/face"
+        assert url_for(locale, "/users/1/faces") == "http://localhost/users/1/face"
+      end
+    end
+
+    test "route_locale/2 falls back to the first locale with routes when the default has none" do
+      for locale <- [:ja, "not a locale", nil] do
+        assert Localize.Routes.route_locale(locale, [:fr, :de]).cldr_locale_id == :fr
+      end
+    end
+
+    test "route_locale/2 keeps a locale that has routes" do
+      assert Localize.Routes.route_locale(:de, [:fr, :de]).cldr_locale_id == :de
+      assert Localize.Routes.route_locale("fr-CH", [:fr, :de]).cldr_locale_id == :fr
     end
 
     test "renders multiple locales in one template-style pass" do

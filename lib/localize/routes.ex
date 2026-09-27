@@ -513,9 +513,12 @@ defmodule Localize.Routes do
 
   @doc false
   # The locale whose localized routes serve `locale`: `locale` itself
-  # when routes exist for it, otherwise the default locale. A locale can
-  # be valid without routes when it is supported but has no Gettext
-  # translations, and `Localize.Plug.PutLocale` accepts such a locale.
+  # when routes exist for it, otherwise the default locale, otherwise the
+  # first locale that has routes. A locale can be valid without routes
+  # when it is supported but has no Gettext translations, and
+  # `Localize.Plug.PutLocale` accepts such a locale. This runs on the
+  # render path for every `~q` link and localized helper, so an invalid
+  # locale falls back like one without routes rather than raising.
   def route_locale(%Localize.LanguageTag{cldr_locale_id: id} = locale, locale_ids) do
     # `~q` runs for every link, and the current locale usually has routes
     if id in locale_ids, do: locale, else: validated_route_locale(locale, locale_ids)
@@ -524,26 +527,24 @@ defmodule Localize.Routes do
   def route_locale(locale, locale_ids), do: validated_route_locale(locale, locale_ids)
 
   defp validated_route_locale(locale, locale_ids) do
-    locale =
-      case Localize.validate_locale(locale) do
-        {:ok, locale} -> locale
-        {:error, exception} -> raise exception
-      end
+    case Localize.validate_locale(locale) do
+      {:ok, %{cldr_locale_id: id} = locale} ->
+        if id in locale_ids, do: locale, else: fallback_route_locale(locale_ids)
 
+      {:error, _invalid} ->
+        fallback_route_locale(locale_ids)
+    end
+  end
+
+  defp fallback_route_locale(locale_ids) do
     default = Localize.default_locale()
 
-    cond do
-      locale.cldr_locale_id in locale_ids ->
-        locale
-
-      default.cldr_locale_id in locale_ids ->
-        default
-
-      true ->
-        raise ArgumentError,
-              "No localized routes for #{inspect(locale.cldr_locale_id)} or for the " <>
-                "default locale #{inspect(default.cldr_locale_id)}. " <>
-                "Localized routes exist for #{inspect(locale_ids)}"
+    with false <- default.cldr_locale_id in locale_ids,
+         [first | _rest] <- locale_ids,
+         {:ok, first} <- Localize.validate_locale(first) do
+      first
+    else
+      _default_has_routes_or_none_do -> default
     end
   end
 

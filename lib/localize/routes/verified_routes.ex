@@ -28,7 +28,10 @@ defmodule Localize.VerifiedRoutes do
       end
 
   A locale without localized routes, for example a supported locale that
-  has no Gettext translations, gets the route of the default locale.
+  has no Gettext translations, gets the route of the default locale, as
+  does an invalid locale. If the default locale has no localized routes
+  either, the first locale that has them is used, so rendering a link
+  never raises.
 
   ### Locale Interpolation
 
@@ -184,7 +187,7 @@ defmodule Localize.VerifiedRoutes do
     as a literal or a runtime expression. It is resolved like
     `Localize.validate_locale/1`, so with `de-CH` configured, `:de` and
     `"de-CH"` both select the German route. A locale without localized
-    routes gets the route of the default locale.
+    routes, or an invalid locale, gets the route of the default locale.
 
   * `route` is a string literal route (with optional `#{...}` interpolations),
     as accepted by `sigil_q/2`.
