@@ -136,7 +136,9 @@ defmodule Localize.LiveViewTest do
           """)
         end)
 
-      assert warning == ""
+      # stderr is shared with concurrently running async tests, so check
+      # for this warning rather than for no output at all.
+      refute warning =~ "is localized for more than one locale"
     end
   end
 
