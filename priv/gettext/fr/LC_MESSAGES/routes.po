@@ -37,3 +37,6 @@ msgstr ""
 
 msgid "login"
 msgstr "connexion"
+
+msgid "video"
+msgstr "vidéo"

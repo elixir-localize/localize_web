@@ -64,7 +64,7 @@ defmodule MyApp.Router do
     end
   end
 
-  live_session :default do
+  localize_live_session :default do
     scope "/", MyAppWeb do
       localize do
         live("/#{locale}", HomeLiveController)

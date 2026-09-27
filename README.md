@@ -65,6 +65,16 @@ def on_mount(:default, _params, session, socket) do
 end
 ```
 
+Define localized live routes with `localize_live_session/3` rather than `live_session/3`. It puts each locale's routes into their own live session, so a live navigation to another locale reloads the page in that locale:
+
+```elixir
+localize_live_session :default, on_mount: [MyAppWeb.LocaleLive] do
+  localize do
+    live "/#{locale}/dashboard", DashboardLive
+  end
+end
+```
+
 ### Localized Routes
 
 Configure your router with localized routes:

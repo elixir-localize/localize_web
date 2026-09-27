@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Plug.PutLocale` now checks `[:route, :path, :query, :session, :accept_language]` by default, so a locale in the URL wins. The previous default put `:session` and `:accept_language` first, and a URL locale never took effect in a browser; pass `:from` to restore it. Closes #25.
 
+### Added
+
+* `Localize.Routes.localize_live_session/3` defines one live session per locale, so a live navigation to another locale reloads the page in that locale rather than keeping the old one. A localized `live` route outside it now warns at compile time. Closes #24.
+
 ## [1.1.0] — 2026-08-11
 
 ### Added
