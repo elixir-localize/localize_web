@@ -1,7 +1,5 @@
 import Config
 
-config :phoenix, :json_library, Jason
-
 # Locales referenced by the test suite (display-name lookups, route
 # translation, plug routing, MF2 rendering). The `mix test` alias in
 # `mix.exs` invokes `mix localize.download_locales`, which populates
