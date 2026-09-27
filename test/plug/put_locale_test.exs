@@ -371,6 +371,55 @@ defmodule Localize.Plug.PutLocaleTest do
     end
   end
 
+  describe "call/2 - Vary response header" do
+    defp vary_after(conn, from) do
+      conn
+      |> PutLocale.call(PutLocale.init(from: from))
+      |> get_resp_header("vary")
+    end
+
+    test "fr from accept-language sets Vary: accept-language" do
+      conn = conn(:get, "/") |> put_req_header("accept-language", "fr")
+      assert vary_after(conn, [:query, :accept_language]) == ["accept-language"]
+    end
+
+    test "de from the query after an empty cookie sets Vary: cookie only" do
+      conn = conn(:get, "/?locale=de") |> fetch_cookies()
+      assert vary_after(conn, [:cookie, :query, :accept_language]) == ["cookie"]
+    end
+
+    test "the default after an empty cookie and !!! accept-language sets both" do
+      conn = conn(:get, "/") |> fetch_cookies() |> put_req_header("accept-language", "!!!")
+      assert vary_after(conn, [:cookie, :accept_language]) == ["cookie, accept-language"]
+    end
+
+    test "de from the query sets no Vary" do
+      conn = conn(:get, "/?locale=de") |> put_req_header("accept-language", "fr")
+      assert vary_after(conn, [:query, :accept_language]) == []
+    end
+
+    test "accept-language is added to an existing Vary: Accept-Encoding once" do
+      conn =
+        conn(:get, "/")
+        |> put_req_header("accept-language", "fr")
+        |> put_resp_header("vary", "Accept-Encoding, Accept-Language")
+
+      assert vary_after(conn, [:accept_language]) == ["Accept-Encoding, Accept-Language"]
+
+      conn = put_resp_header(conn, "vary", "Accept-Encoding")
+      assert vary_after(conn, [:accept_language]) == ["Accept-Encoding, accept-language"]
+    end
+
+    test "an existing Vary: * is kept as is" do
+      conn =
+        conn(:get, "/")
+        |> put_req_header("accept-language", "fr")
+        |> put_resp_header("vary", "*")
+
+      assert vary_after(conn, [:accept_language]) == ["*"]
+    end
+  end
+
   describe "call/2 - default locale" do
     test "uses default locale when no source provides one" do
       options = PutLocale.init(from: [:query])

@@ -14,6 +14,8 @@ defmodule Localize.Plug.PutLocale do
 
   If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`.
 
+  The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. Existing `vary` values are kept. This lets a shared cache store one response per language. A `{Module, function}` source that reads a request header must add its own `vary` value.
+
   ### Options
 
   * `:from` is a list specifying where in the request to look for the locale. The default is `#{inspect(@default_from)}`: a locale in the URL is an explicit choice, so it wins over the session, which in turn wins over the browser's `accept-language` header. The valid options are:
@@ -89,7 +91,9 @@ defmodule Localize.Plug.PutLocale do
 
   @doc false
   def call(conn, options) do
-    locale = locale_from_params(conn, options[:from], options) || default(conn, options)
+    {locale, consulted} = locale_from_params(conn, options[:from], options)
+    locale = locale || default(conn, options)
+    conn = put_vary(conn, consulted)
 
     if locale do
       Localize.put_locale(locale)
@@ -213,13 +217,46 @@ defmodule Localize.Plug.PutLocale do
     end
   end
 
+  # Returns the locale of the first source that has one, and the sources
+  # consulted to find it (all of them when none has one).
   defp locale_from_params(conn, from, options) do
-    Enum.reduce_while(from, nil, fn param, _acc ->
-      conn
-      |> fetch_param(param, options[:param], options)
-      |> return_if_valid_locale()
+    Enum.reduce_while(from, {nil, []}, fn source, {nil, consulted} ->
+      consulted = consulted ++ [source]
+
+      case fetch_param(conn, source, options[:param], options) do
+        {:ok, locale} -> {:halt, {locale, consulted}}
+        _other -> {:cont, {nil, consulted}}
+      end
     end)
   end
+
+  # A shared cache must key the response on every request header that
+  # could have changed the locale, or it serves one language to everyone.
+  defp put_vary(conn, consulted) do
+    existing =
+      conn
+      |> get_resp_header("vary")
+      |> Enum.flat_map(&String.split(&1, ","))
+      |> Enum.map(&String.trim/1)
+
+    known = Enum.map(existing, &String.downcase/1)
+
+    new =
+      consulted
+      |> Enum.flat_map(&vary_fields/1)
+      |> Enum.uniq()
+      |> Enum.reject(&(&1 in known))
+
+    if new == [] or "*" in known do
+      conn
+    else
+      put_resp_header(conn, "vary", Enum.join(existing ++ new, ", "))
+    end
+  end
+
+  defp vary_fields(:accept_language), do: ["accept-language"]
+  defp vary_fields(source) when source in [:session, :cookie], do: ["cookie"]
+  defp vary_fields(_source), do: []
 
   defp fetch_param(conn, :accept_language, _param, _options) do
     case get_req_header(conn, @language_header) do
@@ -301,14 +338,6 @@ defmodule Localize.Plug.PutLocale do
 
   defp validate_locale_param(locale) do
     Localize.validate_locale(locale)
-  end
-
-  defp return_if_valid_locale({:ok, locale}) do
-    {:halt, locale}
-  end
-
-  defp return_if_valid_locale(_) do
-    {:cont, nil}
   end
 
   defp validate_from(options, nil), do: Keyword.put(options, :from, @default_from)
