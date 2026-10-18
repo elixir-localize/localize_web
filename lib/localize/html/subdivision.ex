@@ -244,14 +244,20 @@ defmodule Localize.HTML.Subdivision do
   # A subdivision code whose stripped form is itself an ISO 3166-1 territory
   # is named as that territory. Anything else has no territory to fall back to.
   defp territory_name(full_code, territory, locale) do
-    with code <- strip_territory(full_code, territory),
-         {:ok, subdivision_territory} <- Localize.validate_territory(code),
-         {:ok, name} <- Localize.Territory.display_name(subdivision_territory, locale: locale) do
-      name
-    else
-      _other -> nil
+    full_code
+    |> strip_territory(territory)
+    |> Localize.validate_territory()
+    |> territory_display_name(locale)
+  end
+
+  defp territory_display_name({:ok, territory}, locale) do
+    case Localize.Territory.display_name(territory, locale: locale) do
+      {:ok, name} -> name
+      {:error, _no_name} -> nil
     end
   end
+
+  defp territory_display_name({:error, _not_a_territory}, _locale), do: nil
 
   # Sorting by name has to be locale-aware: an alphabetical sort of French
   # names under an English collation puts accented names in the wrong place.

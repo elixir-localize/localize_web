@@ -265,16 +265,18 @@ defmodule Localize.Plug.PutLocale do
       |> List.last()
       |> String.downcase()
 
-    with true <- country_code_tld?(tld),
-         false <- tld in generic,
-         {:ok, territory} <- Localize.validate_territory(String.upcase(tld)) do
-      Localize.validate_locale("und-#{territory}")
-    else
-      _not_a_country_code -> nil
-    end
+    if country_code_tld?(tld) and tld not in generic, do: locale_from_tld(tld)
   end
 
   def locale_from_host(_host, _options), do: nil
+
+  # A country-code domain names its territory, unless no territory has the code.
+  defp locale_from_tld(tld) do
+    case Localize.validate_territory(String.upcase(tld)) do
+      {:ok, territory} -> Localize.validate_locale("und-#{territory}")
+      {:error, _not_a_territory} -> nil
+    end
+  end
 
   defp country_code_tld?(tld) do
     String.length(tld) == @cctld_length and tld =~ ~r/^[a-z]{2}$/

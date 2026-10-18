@@ -6,6 +6,14 @@ defmodule Localize.AcceptLanguage do
 
   """
 
+  # `Localize.validate_locale/1` never rejects a valid tag: with no close
+  # supported locale it falls back to the first one (`ja` resolves to
+  # `de-CH` data when only `de-CH` and `en-CH` are supported). A distance
+  # of 80 means unrelated languages, so a match within 79 keeps every
+  # CLDR match (`en-US` to `en-CH`, `gsw` to `de-CH`) and skips the
+  # fallback.
+  @max_match_distance 79
+
   @doc """
   Tokenizes an `Accept-Language` header string into a list of
   `{quality, language_tag_string}` tuples sorted by quality descending.
@@ -107,18 +115,11 @@ defmodule Localize.AcceptLanguage do
   @spec best_match(term()) ::
           {:ok, Localize.LanguageTag.t()} | {:error, Exception.t()}
   def best_match(header) when is_binary(header) do
-    result =
-      header
-      |> tokenize()
-      |> Enum.find_value(fn {_quality, tag} -> supported_match(tag) end)
+    no_match = {:error, Localize.UnknownLocaleError.exception(locale_id: header)}
 
-    case result do
-      %Localize.LanguageTag{} = locale ->
-        {:ok, locale}
-
-      nil ->
-        {:error, Localize.UnknownLocaleError.exception(locale_id: header)}
-    end
+    header
+    |> tokenize()
+    |> Enum.find_value(no_match, fn {_quality, tag} -> matched(supported_match(tag)) end)
   end
 
   def best_match(header), do: {:error, invalid_header(header)}
@@ -130,15 +131,9 @@ defmodule Localize.AcceptLanguage do
     )
   end
 
-  # `Localize.validate_locale/1` never rejects a valid tag: with no close
-  # supported locale it falls back to the first one (`ja` resolves to
-  # `de-CH` data when only `de-CH` and `en-CH` are supported). A distance
-  # of 80 means unrelated languages, so a match within 79 keeps every
-  # CLDR match (`en-US` to `en-CH`, `gsw` to `de-CH`) and skips the
-  # fallback. When CLDR matches across languages, the supported locale
-  # is returned, so its language is the one being served.
-  @max_match_distance 79
-
+  # A header tag's supported locale, when it matches one within
+  # `@max_match_distance`. When CLDR matches across languages, the supported
+  # locale is returned, so its language is the one being served.
   defp supported_match(tag) do
     with {:ok, requested} <- Localize.validate_locale(tag),
          {:ok, locale_id, _distance} <-
@@ -148,11 +143,14 @@ defmodule Localize.AcceptLanguage do
              @max_match_distance
            ),
          {:ok, served} <- Localize.validate_locale(locale_id) do
-      if served.language == requested.language, do: requested, else: served
-    else
-      _no_match -> nil
+      {:ok, if(served.language == requested.language, do: requested, else: served)}
     end
   end
+
+  # `Enum.find_value/3` takes any value but `nil` or `false` as found, so a
+  # tag that matches no supported locale answers `nil`.
+  defp matched({:ok, _locale} = match), do: match
+  defp matched({:error, _no_match}), do: nil
 
   # Split on the `;q=` weight parameter. A well-formed tag has at most one
   # weight, but real-world Accept-Language headers sometimes contain

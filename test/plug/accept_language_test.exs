@@ -77,33 +77,38 @@ defmodule Localize.Plug.AcceptLanguageTest do
       assert conn.private[:localize_locale] == nil
     end
 
+    # `capture_log/1` gathers what every process logs while it runs, and this
+    # module runs alongside others, so each test sends a header of its own and
+    # looks for that header in the log rather than for the log as a whole.
     test "logs warning when no matching locale found" do
       options = AcceptLanguage.init([])
+      header = unmatched_header()
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
           :get
           |> conn("/")
-          |> put_req_header("accept-language", "!!!")
+          |> put_req_header("accept-language", header)
           |> AcceptLanguage.call(options)
         end)
 
       assert log =~ "Localize.Plug.AcceptLanguage"
-      assert log =~ "!!!"
+      assert log =~ header
     end
 
     test "does not log when log level is nil" do
       options = AcceptLanguage.init(no_match_log_level: nil)
+      header = unmatched_header()
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
           :get
           |> conn("/")
-          |> put_req_header("accept-language", "!!!")
+          |> put_req_header("accept-language", header)
           |> AcceptLanguage.call(options)
         end)
 
-      assert log == ""
+      refute log =~ header
     end
 
     test "selects highest quality matching locale" do
@@ -147,4 +152,8 @@ defmodule Localize.Plug.AcceptLanguageTest do
       assert AcceptLanguage.get_locale(conn) == nil
     end
   end
+
+  # An Accept-Language value that matches no locale and appears in no other
+  # test's log.
+  defp unmatched_header, do: "!!!-#{System.unique_integer([:positive])}"
 end
