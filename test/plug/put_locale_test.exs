@@ -138,6 +138,35 @@ defmodule Localize.Plug.PutLocaleTest do
     end
   end
 
+  describe "call/2 - set locale from the route" do
+    # The router stores the tag it validated when it compiled the route, so
+    # the plug takes it as it stands.
+    test "takes the route's language tag as it stands" do
+      {:ok, route_locale} = Localize.validate_locale("fr")
+      options = PutLocale.init(from: [:route])
+
+      conn =
+        :get
+        |> conn("/")
+        |> put_private(:localize_locale, route_locale)
+        |> PutLocale.call(options)
+
+      assert conn.private[:localize_locale] == route_locale
+    end
+
+    test "validates a locale the route stores as a string" do
+      options = PutLocale.init(from: [:route])
+
+      conn =
+        :get
+        |> conn("/")
+        |> put_private(:localize_locale, "fr")
+        |> PutLocale.call(options)
+
+      assert %Localize.LanguageTag{cldr_locale_id: :fr} = conn.private[:localize_locale]
+    end
+  end
+
   describe "call/2 - set locale from body param" do
     test "sets locale from body parameter" do
       options = PutLocale.init(from: [:body])

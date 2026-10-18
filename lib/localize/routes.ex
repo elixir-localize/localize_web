@@ -65,6 +65,11 @@ defmodule Localize.Routes do
     :live
   ]
 
+  # Gettext locales that name no language, and so have no routes of their own.
+  @meta_locales [:und, :"en-001"]
+
+  @route_keys [:verb, :path, :plug, :plug_opts, :helper, :metadata]
+
   defmacro __using__(options) do
     gettext_backend = Keyword.fetch!(options, :gettext)
     helpers? = Keyword.get(options, :helpers, true)
@@ -203,7 +208,9 @@ defmodule Localize.Routes do
 
   defmacro localize(do: route) do
     gettext_backend = Module.get_attribute(__CALLER__.module, :_gettext_backend)
-    locale_ids = locales_from_gettext(gettext_backend)
+
+    # `localize/2` takes the locale ids a router names, as it is written.
+    locale_ids = gettext_backend |> locales_from_gettext() |> Enum.map(& &1.cldr_locale_id)
 
     quote location: :keep do
       require unquote(gettext_backend)
@@ -376,9 +383,11 @@ defmodule Localize.Routes do
     end
 
     live_sessions =
-      for locale_id <- locales_from_gettext(gettext_backend),
-          {:ok, locale} <- [Localize.validate_locale(locale_id)],
+      for locale <- locales_from_gettext(gettext_backend),
           match?({:ok, _}, Localize.Locale.gettext_locale_id(locale, gettext_backend)) do
+        # The session's name and its `localize` blocks take the locale id,
+        # as a router writes it.
+        locale_id = locale.cldr_locale_id
         session_locale = Localize.LanguageTag.to_string(locale)
 
         session =
@@ -496,9 +505,11 @@ defmodule Localize.Routes do
     end)
   end
 
-  @meta_locales [:und, :"en-001"]
-
   @doc false
+  # The language tags of the backend's Gettext locales, one for each locale
+  # id, in the backend's order. Gettext names its locales as strings, so they
+  # are validated here, once, and the tags are what the router macros carry
+  # into the routes they generate.
   def locales_from_gettext(gettext_backend) do
     gettext_backend
     |> Gettext.known_locales()
@@ -507,8 +518,8 @@ defmodule Localize.Routes do
       {:ok, %{cldr_locale_id: id}} when id not in @meta_locales -> true
       _ -> false
     end)
-    |> Enum.map(fn {:ok, locale} -> locale.cldr_locale_id end)
-    |> Enum.uniq()
+    |> Enum.map(fn {:ok, locale} -> locale end)
+    |> Enum.uniq_by(& &1.cldr_locale_id)
   end
 
   @doc false
@@ -524,28 +535,33 @@ defmodule Localize.Routes do
   # routes falls back without being validated again; a string or an atom,
   # as `path_for/2` and `url_for/2` accept, is validated once and re-enters
   # with the tag.
-  def route_locale(%Localize.LanguageTag{cldr_locale_id: id} = locale, locale_ids)
+  #
+  # `route_locales` are the tags of the locales that have routes, in Gettext
+  # order, as `locales_from_gettext/1` gives them to the generated code.
+  def route_locale(%Localize.LanguageTag{cldr_locale_id: id} = locale, route_locales)
       when not is_nil(id) do
-    if id in locale_ids, do: locale, else: fallback_route_locale(locale_ids)
+    if routed?(id, route_locales), do: locale, else: fallback_route_locale(route_locales)
   end
 
-  def route_locale(locale, locale_ids) do
+  def route_locale(locale, route_locales) do
     case Localize.validate_locale(locale) do
-      {:ok, tag} -> route_locale(tag, locale_ids)
-      {:error, _invalid} -> fallback_route_locale(locale_ids)
+      {:ok, tag} -> route_locale(tag, route_locales)
+      {:error, _invalid} -> fallback_route_locale(route_locales)
     end
   end
 
-  defp fallback_route_locale(locale_ids) do
+  defp fallback_route_locale(route_locales) do
     default = Localize.default_locale()
 
-    with false <- default.cldr_locale_id in locale_ids,
-         [first | _rest] <- locale_ids,
-         {:ok, first} <- Localize.validate_locale(first) do
-      first
-    else
-      _default_has_routes_or_none_do -> default
+    cond do
+      routed?(default.cldr_locale_id, route_locales) -> default
+      route_locales != [] -> hd(route_locales)
+      true -> default
     end
+  end
+
+  defp routed?(locale_id, route_locales) do
+    Enum.any?(route_locales, &(&1.cldr_locale_id == locale_id))
   end
 
   @doc false
@@ -934,8 +950,6 @@ defmodule Localize.Routes do
        when is_atom(action) do
     {verb, meta, [path, controller, action]}
   end
-
-  @route_keys [:verb, :path, :plug, :plug_opts, :helper, :metadata]
 
   @doc false
   def routes(routes) do

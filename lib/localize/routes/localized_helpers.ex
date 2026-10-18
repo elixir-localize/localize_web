@@ -29,8 +29,8 @@ defmodule Localize.Routes.LocalizedHelpers do
     groups = Enum.group_by(routes, fn {route, _exprs} -> route.helper end)
 
     docs = Keyword.get(opts, :docs, true)
-    locale_ids = Localize.Routes.locales_from_gettext(gettext_backend)
-    localized_helpers = localized_helpers(groups, locale_ids)
+    route_locales = Localize.Routes.locales_from_gettext(gettext_backend)
+    localized_helpers = localized_helpers(groups, route_locales)
     non_localized_helpers = non_localized_helpers(groups, helper_module)
     delegate_helpers = delegate_helpers(groups, helper_module, gettext_backend)
     other_delegates = other_delegates(helper_module)
@@ -56,7 +56,10 @@ defmodule Localize.Routes.LocalizedHelpers do
     Module.create(localized_helper_module, code, line: env.line, file: env.file)
   end
 
-  defp localized_helpers(groups, locale_ids) do
+  defp localized_helpers(groups, route_locales) do
+    # Escaped once and baked into every helper, which hands the tags to
+    # `Localize.Routes.route_locale/2` as they are.
+    escaped_locales = Macro.escape(route_locales)
     seen = :sets.new()
 
     {helpers, _} =
@@ -91,7 +94,7 @@ defmodule Localize.Routes.LocalizedHelpers do
               plug_opts,
               unquote_splicing(vars)
             ) do
-          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(locale_ids))
+          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(escaped_locales))
 
           helper(
             unquote(helper_fun_name),
@@ -110,7 +113,7 @@ defmodule Localize.Routes.LocalizedHelpers do
               unquote_splicing(vars),
               params
             ) do
-          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(locale_ids))
+          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(escaped_locales))
 
           helper(
             unquote(helper_fun_name),
@@ -168,12 +171,11 @@ defmodule Localize.Routes.LocalizedHelpers do
   end
 
   defp delegate_helpers(groups, helper_module, gettext_backend) do
-    all_locale_ids = Localize.Routes.locales_from_gettext(gettext_backend)
+    route_locales = Localize.Routes.locales_from_gettext(gettext_backend)
 
     for {_helper, helper_routes} <- groups,
         {_, [{route, exprs} | _]} <- routes_in_order(helper_routes),
-        locale_id <- all_locale_ids,
-        {:ok, locale} = Localize.validate_locale(locale_id),
+        locale <- route_locales,
         {:ok, gettext_locale} = Localize.Locale.gettext_locale_id(locale, gettext_backend),
         suffix <- @known_suffixes,
         helper_fun_name = strip_locale(route.helper, gettext_locale),
@@ -185,7 +187,7 @@ defmodule Localize.Routes.LocalizedHelpers do
         def helper(
               unquote(helper_fun_name),
               unquote(suffix),
-              %Localize.LanguageTag{cldr_locale_id: unquote(locale_id)},
+              %Localize.LanguageTag{cldr_locale_id: unquote(locale.cldr_locale_id)},
               conn_or_endpoint,
               plug_opts,
               unquote_splicing(vars),

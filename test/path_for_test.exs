@@ -71,15 +71,23 @@ defmodule PathFor.Test do
       end
     end
 
+    # The routes' locales reach `route_locale/2` as the language tags the
+    # router macros carry; the locale asked for may be anything.
     test "route_locale/2 falls back to the first locale with routes when the default has none" do
+      {:ok, fr} = Localize.validate_locale(:fr)
+      {:ok, de} = Localize.validate_locale(:de)
+
       for locale <- [:ja, "not a locale", nil] do
-        assert Localize.Routes.route_locale(locale, [:fr, :de]).cldr_locale_id == :fr
+        assert Localize.Routes.route_locale(locale, [fr, de]) == fr
       end
     end
 
     test "route_locale/2 keeps a locale that has routes" do
-      assert Localize.Routes.route_locale(:de, [:fr, :de]).cldr_locale_id == :de
-      assert Localize.Routes.route_locale("fr-CH", [:fr, :de]).cldr_locale_id == :fr
+      {:ok, fr} = Localize.validate_locale(:fr)
+      {:ok, de} = Localize.validate_locale(:de)
+
+      assert Localize.Routes.route_locale(:de, [fr, de]).cldr_locale_id == :de
+      assert Localize.Routes.route_locale("fr-CH", [fr, de]).cldr_locale_id == :fr
     end
 
     test "renders multiple locales in one template-style pass" do

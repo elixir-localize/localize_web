@@ -20,8 +20,9 @@ defmodule Localize.VerifiedRoutes do
 
   The `~q` sigil generates a `case` statement that dispatches to the appropriate localized `~p` route based on the current locale:
 
-      # ~q"/users" generates:
-      case Localize.Routes.route_locale(Localize.get_locale(), [:de, :en, :fr]).cldr_locale_id do
+      # ~q"/users" generates, where `route_locales` are the language tags
+      # of the Gettext locales :de, :en and :fr:
+      case Localize.Routes.route_locale(Localize.get_locale(), route_locales).cldr_locale_id do
         :de -> ~p"/benutzer"
         :en -> ~p"/users"
         :fr -> ~p"/utilisateurs"
@@ -243,22 +244,22 @@ defmodule Localize.VerifiedRoutes do
   '''
   defmacro hreflang_links(route, options \\ []) do
     gettext = Module.get_attribute(__CALLER__.module, :_localize_gettext_backend)
-    locale_ids = Localize.Routes.locales_from_gettext(gettext)
+    route_locales = Localize.Routes.locales_from_gettext(gettext)
     route_ast = Localize.VerifiedRoutes.normalize_route_ast(route)
 
     case_clauses =
-      Localize.VerifiedRoutes.sigil_q_case_clauses(route_ast, [], locale_ids, gettext)
+      Localize.VerifiedRoutes.sigil_q_case_clauses(route_ast, [], route_locales, gettext)
 
     pairs =
-      Enum.map(locale_ids, fn locale ->
+      Enum.map(route_locales, fn %Localize.LanguageTag{cldr_locale_id: locale_id} ->
         case_expr =
           quote location: :keep do
-            case unquote(locale) do
+            case unquote(locale_id) do
               unquote(case_clauses)
             end
           end
 
-        {Kernel.to_string(locale), wrap_sigil_p_in_url(case_expr)}
+        {Kernel.to_string(locale_id), wrap_sigil_p_in_url(case_expr)}
       end)
 
     quote location: :keep do
@@ -288,11 +289,11 @@ defmodule Localize.VerifiedRoutes do
   # `locale`, as chosen by `Localize.Routes.route_locale/2`.
   defp locale_case(locale, route, flags, caller) do
     gettext = Module.get_attribute(caller.module, :_localize_gettext_backend)
-    locale_ids = Localize.Routes.locales_from_gettext(gettext)
-    case_clauses = sigil_q_case_clauses(route, flags, locale_ids, gettext)
+    route_locales = Localize.Routes.locales_from_gettext(gettext)
+    case_clauses = sigil_q_case_clauses(route, flags, route_locales, gettext)
 
     quote location: :keep do
-      case Localize.Routes.route_locale(unquote(locale), unquote(locale_ids)).cldr_locale_id do
+      case Localize.Routes.route_locale(unquote(locale), unquote(Macro.escape(route_locales))).cldr_locale_id do
         unquote(case_clauses)
       end
     end
@@ -316,29 +317,31 @@ defmodule Localize.VerifiedRoutes do
   end
 
   @doc false
-  def sigil_q_case_clauses(route, flags, locale_ids, gettext_backend) do
-    for locale_id <- locale_ids do
-      with {:ok, locale} <- Localize.validate_locale(locale_id),
-           {:ok, _gettext_locale} <- Localize.Locale.gettext_locale_id(locale, gettext_backend) do
+  # One `case` clause for each locale in `route_locales`, the tags
+  # `Localize.Routes.locales_from_gettext/1` gives, keyed by locale id.
+  def sigil_q_case_clauses(route, flags, route_locales, gettext_backend) do
+    Enum.flat_map(route_locales, &sigil_q_case_clause(route, flags, &1, gettext_backend))
+  end
+
+  defp sigil_q_case_clause(route, flags, locale, gettext_backend) do
+    case Localize.Locale.gettext_locale_id(locale, gettext_backend) do
+      {:ok, _gettext_locale} ->
         translated_route =
           Localize.Routes.interpolate_and_translate_path(route, locale, gettext_backend)
 
         quote location: :keep do
-          unquote(locale_id) -> sigil_p(unquote(translated_route), unquote(flags))
+          unquote(locale.cldr_locale_id) -> sigil_p(unquote(translated_route), unquote(flags))
         end
-      else
-        {:error, _reason} ->
-          IO.warn(
-            "Locale #{inspect(locale_id)} has no associated gettext locale. " <>
-              "Cannot translate #{inspect(route)}",
-            []
-          )
 
-          nil
-      end
+      {:error, _reason} ->
+        IO.warn(
+          "Locale #{inspect(locale.cldr_locale_id)} has no associated gettext locale. " <>
+            "Cannot translate #{inspect(route)}",
+          []
+        )
+
+        []
     end
-    |> Enum.reject(&is_nil/1)
-    |> Enum.map(&hd/1)
   end
 
   @doc false

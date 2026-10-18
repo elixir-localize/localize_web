@@ -395,9 +395,11 @@ defmodule Localize.Plug.PutLocale do
 
   defp validate_locale_param(nil), do: nil
 
-  defp validate_locale_param(%Localize.LanguageTag{} = locale) do
-    Localize.validate_locale(locale)
-  end
+  # The router, `Localize.Plug.AcceptLanguage` and this plug each store a tag
+  # they validated, so a tag found here is trusted as it stands.
+  defp validate_locale_param(%Localize.LanguageTag{cldr_locale_id: id} = locale)
+       when not is_nil(id),
+       do: {:ok, locale}
 
   defp validate_locale_param(locale) do
     Localize.validate_locale(locale)
