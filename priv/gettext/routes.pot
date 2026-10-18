@@ -33,3 +33,6 @@ msgstr ""
 
 msgid "login"
 msgstr ""
+
+msgid "video"
+msgstr ""

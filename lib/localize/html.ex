@@ -71,7 +71,7 @@ defmodule Localize.HTML do
 
   ### Returns
 
-  * A `Phoenix.HTML.safe()` value suitable for HEEx interpolation.
+  * A `Phoenix.HTML.safe()` value suitable for HEEx interpolation. A translation that cannot be rendered, such as one with invalid MF2 syntax, logs a warning and renders its source text, escaped, rather than raising.
 
   ### Examples
 
@@ -128,7 +128,7 @@ defmodule Localize.HTML do
           Localize.Gettext.Interpolation.skip_interpolation_sentinel()
         )
 
-      Localize.HTML.Message.render_to_safe(
+      Localize.HTML.Message.render_to_safe_or_source(
         translated,
         unquote(bindings_map_ast),
         unquote(options_ast)

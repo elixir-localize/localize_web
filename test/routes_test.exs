@@ -1,3 +1,14 @@
+defmodule Localize.Routes.Test.NestedWithOptionsRouter do
+  use MyAppWeb, :router
+  use Localize.Routes, gettext: MyApp.Gettext
+
+  localize [:fr] do
+    resources "/users", UserController, only: [:index] do
+      resources("/faces", FaceController, only: [:index])
+    end
+  end
+end
+
 defmodule Localize.Routes.Test do
   use ExUnit.Case
   import Plug.Test
@@ -68,6 +79,13 @@ defmodule Localize.Routes.Test do
 
       Localize.put_locale(:fr)
       assert MyApp.Router.LocalizedHelpers.page_path(%Plug.Conn{}, :show, 1) == "/pages_fr/1"
+    end
+
+    test "localized path helper under :ja, which has no routes, renders the default locale's (:en) path" do
+      Localize.put_locale(:ja)
+
+      assert MyApp.Router.LocalizedHelpers.user_face_path(%Plug.Conn{}, :index, 1) ==
+               "/users/1/face"
     end
 
     test "localized path helper with configured :as" do
@@ -142,6 +160,12 @@ defmodule Localize.Routes.Test do
       assert conn.private.localize_locale == locale
     end
 
+    test "a route with private: @page_private keeps section: :docs next to its locale fr" do
+      conn = get(build_conn(), "/fr/sections/1")
+      assert conn.private.section == :docs
+      assert conn.private.localize_locale.cldr_locale_id == :fr
+    end
+
     @endpoint MyApp.Endpoint
 
     test "hreflang link helper" do
@@ -173,6 +197,16 @@ defmodule Localize.Routes.Test do
       assert links == %{}
       assert header_io_data == {:safe, []}
       assert header == ""
+    end
+  end
+
+  describe "Nested resources" do
+    test "a parent with options translates the nested path" do
+      paths =
+        Localize.Routes.Test.NestedWithOptionsRouter.__routes__()
+        |> Enum.map(& &1.path)
+
+      assert paths == ["/users_fr", "/users_fr/:user_id/faces_fr"]
     end
   end
 end

@@ -25,6 +25,8 @@ defmodule Localize.HTML.Territory do
           flag: String.t()
         }
 
+  alias Localize.HTML.Options
+
   @omit_from_select_options [:territories, :locale, :mapper, :collator, :style]
 
   @doc """
@@ -40,7 +42,7 @@ defmodule Localize.HTML.Territory do
 
   ### Options
 
-  * `:territories` defines the list of territories to be displayed in the select tag. The default is `Localize.Territory.territory_codes/0`.
+  * `:territories` defines the list of territories to be displayed in the select tag. The default is `Localize.Territory.individual_territories/0`: every current country and region, without groupings such as `:EU` or deprecated codes.
 
   * `:style` is the format of the territory name. The options are `:standard` (the default), `:short` and `:variant`.
 
@@ -58,6 +60,8 @@ defmodule Localize.HTML.Territory do
 
   * A `t:Phoenix.HTML.safe/0` select tag, or
 
+  * `{:error, exception}` when an option is invalid.
+
   ### Examples
 
       iex> Localize.HTML.Territory.select(:my_form, :territory, selected: :AU)
@@ -71,10 +75,24 @@ defmodule Localize.HTML.Territory do
           Phoenix.HTML.safe()
           | {:error, Exception.t()}
 
-  def select(form, field, options \\ [])
+  def select(form, field, options \\ []) do
+    case validate_options(options) do
+      {:ok, options} ->
+        select_options =
+          options
+          |> Map.drop(@omit_from_select_options)
+          |> Map.to_list()
 
-  def select(form, field, options) when is_list(options) do
-    select(form, field, validate_options(options), options[:selected])
+        PhoenixHTMLHelpers.Form.select(
+          form,
+          field,
+          build_territory_options(options),
+          select_options
+        )
+
+      {:error, exception} ->
+        {:error, exception}
+    end
   end
 
   @doc """
@@ -90,94 +108,44 @@ defmodule Localize.HTML.Territory do
 
   ### Returns
 
-  * A list of `{display_name, territory_code}` tuples.
+  * A list of `{display_name, territory_code}` tuples, or
+
+  * `{:error, exception}` when an option is invalid.
 
   """
-  @spec territory_options(select_options) :: list(tuple())
+  @spec territory_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 
-  def territory_options(options \\ [])
-
-  def territory_options(options) when is_list(options) do
-    options
-    |> validate_options()
-    |> build_territory_options()
-  end
-
-  defp select(_form, _field, {:error, reason}, _selected) do
-    {:error, reason}
-  end
-
-  defp select(form, field, options, _selected) do
-    select_options =
-      options
-      |> Map.drop(@omit_from_select_options)
-      |> Map.to_list()
-
-    options = build_territory_options(options)
-
-    PhoenixHTMLHelpers.Form.select(form, field, options, select_options)
+  def territory_options(options \\ []) do
+    with {:ok, options} <- validate_options(options) do
+      build_territory_options(options)
+    end
   end
 
   defp default_options do
-    Map.new(
-      territories: Localize.Territory.territory_codes(),
+    %{
+      territories: Localize.Territory.individual_territories(),
       locale: Localize.get_locale(),
       collator: &default_collator/1,
       mapper: &{&1.flag <> " " <> &1.name, &1.territory_code},
+      style: :standard,
       selected: nil
-    )
+    }
   end
 
   defp validate_options(options) do
-    options = Map.new(options)
-
-    with options <- Map.merge(default_options(), options),
-         {:ok, options} <- validate_locale(options),
-         {:ok, options} <- validate_selected(options),
-         {:ok, options} <- validate_territories(options) do
-      options
+    with {:ok, options} <- Options.merge(options, default_options()),
+         {:ok, options} <- Options.locale(options),
+         {:ok, options} <- Options.one_of(options, :style, Localize.Territory.known_styles()),
+         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.function(options, :mapper),
+         {:ok, options} <- Options.optional(options, :selected, &validate_territory/1) do
+      Options.list(options, :territories, &validate_territory/1)
     end
   end
 
-  defp validate_selected(%{selected: nil} = options) do
-    {:ok, options}
+  defp validate_territory(territory) do
+    Options.code(territory, :territory, &Localize.validate_territory/1)
   end
-
-  defp validate_selected(%{selected: selected} = options) do
-    with {:ok, territory} <- Localize.validate_territory(selected) do
-      {:ok, Map.put(options, :selected, territory)}
-    end
-  end
-
-  defp validate_territories(%{territories: territories} = options) do
-    validate_territories(territories, options)
-  end
-
-  defp validate_territories(territories) when is_list(territories) do
-    Enum.reduce_while(territories, [], fn territory, acc ->
-      case Localize.validate_territory(territory) do
-        {:ok, territory} -> {:cont, [territory | acc]}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp validate_territories(territories, options) do
-    case validate_territories(territories) do
-      {:error, reason} -> {:error, reason}
-      territories -> {:ok, Map.put(options, :territories, Enum.reverse(territories))}
-    end
-  end
-
-  defp validate_locale(options) do
-    with {:ok, locale} <- Localize.validate_locale(options[:locale]) do
-      options
-      |> Map.put(:locale, locale)
-      |> wrap(:ok)
-    end
-  end
-
-  defp wrap(term, atom), do: {atom, term}
 
   defp maybe_include_selected_territory(%{selected: nil} = options) do
     options
@@ -245,14 +213,4 @@ defmodule Localize.HTML.Territory do
   defp info_options(%{locale: locale, style: style}) do
     [locale: locale, style: style]
   end
-
-  defp info_options(%{locale: locale}) do
-    [locale: locale]
-  end
-
-  defp info_options(%{style: style}) do
-    [style: style]
-  end
-
-  defp info_options(_options), do: []
 end

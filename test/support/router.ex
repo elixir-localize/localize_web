@@ -64,12 +64,19 @@ defmodule MyApp.Router do
     end
   end
 
-  live_session :default do
+  localize_live_session :default do
     scope "/", MyAppWeb do
       localize do
         live("/#{locale}", HomeLiveController)
       end
     end
+  end
+
+  # Route options given as a module attribute
+  @page_private %{section: :docs}
+
+  localize [:en, :fr] do
+    get("/#{locale}/sections/:page", PageController, :show, private: @page_private)
   end
 
   # Unlocalized route with translatable path elements

@@ -32,6 +32,10 @@ defmodule Localize.Routes do
 
   * `territory` will interpolate the territory code.
 
+  ### Localized Live Routes
+
+  Define localized `live` routes inside `localize_live_session/3` rather than `Phoenix.LiveView.Router.live_session/3`. It puts each locale's routes into their own live session, so a live navigation to another locale is a full page load in that locale.
+
   ### Localized Helpers
 
   A `LocalizedHelpers` module is generated at compile time. Assuming the router module is called `MyApp.Router` then the full name of the localized helper module is `MyApp.Router.LocalizedHelpers`.
@@ -234,10 +238,17 @@ defmodule Localize.Routes do
   defmacro localize(locale_ids, do: route) when is_list(locale_ids) do
     gettext_backend = Module.get_attribute(__CALLER__.module, :_gettext_backend)
 
-    locale_ids
-    |> Enum.map(&localized_route(&1, route, gettext_backend))
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq_by(&canonical_route/1)
+    routes =
+      locale_ids
+      |> Enum.map(&localized_route(&1, route, gettext_backend))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq_by(&canonical_route/1)
+
+    if match?({:live, _, _}, route) and length(routes) > 1 do
+      warn_live_route(route, __CALLER__)
+    end
+
+    routes
   end
 
   # Single locale (string or atom) - wrap in list
@@ -278,6 +289,22 @@ defmodule Localize.Routes do
     end
   end
 
+  defmacro localize(
+             locale,
+             {:resources, _, [path, controller, options, [do: {fun, _, _}] = nested]}
+           )
+           when fun != :localize do
+    nested = localize_nested_resources(locale, nested)
+
+    quote location: :keep do
+      localize unquote(locale) do
+        resources unquote(path), unquote(controller), unquote(options) do
+          unquote(nested)
+        end
+      end
+    end
+  end
+
   # Do the actual translations - locale is {%LanguageTag{}, gettext_locale_string}
   defmacro localize({locale, gettext_locale}, {verb, meta, [path | args]})
            when verb in @localizable_verbs do
@@ -295,6 +322,96 @@ defmodule Localize.Routes do
           Invalid route for localization: #{verb} #{inspect(path)}, #{inspect(args)}
           Allowed localizable routes are #{inspect(@localizable_verbs)}
           """
+  end
+
+  @doc """
+  Defines one LiveView live session per locale, each holding that locale's localized routes.
+
+  A live navigation mounts the next LiveView over the existing socket: no plug runs, the root layout (`<html lang>`, hreflang links) is not rendered again, and the `on_mount` callbacks receive the session of the page the navigation started from. So a live navigation from `/en/video` to `/fr/vidéo` would render the French route in English.
+
+  LiveView performs a full page load whenever a navigation crosses from one live session into another. This macro puts each locale's routes into their own live session, so a navigation to another locale reloads the page and runs the plug pipeline, while navigation within one locale stays live. Each live session also sets the locale in the LiveView session under the key `"#{Localize.Plug.PutLocale.session_key()}"`, so an `on_mount` callback that calls `Localize.Plug.put_locale_from_session/2` sets the locale of the route being mounted.
+
+  ### Arguments
+
+  * `name` is an atom naming the live session. Each locale's live session is named `:"\#{name}_\#{locale}"`, for example `:default_fr`.
+
+  * `options` is a keyword list of options passed to `Phoenix.LiveView.Router.live_session/3`.
+
+  * `block` holds the routes. Every route in it must be inside a `localize/1` or `localize/2` block, since any other route would be defined once per locale. `scope/2` and `pipe_through/1` may be used as usual.
+
+  ### Options
+
+  * `:on_mount`, `:layout` and `:root_layout` are passed to each live session unchanged.
+
+  * `:session` is a map or a `{module, function, args}` tuple, as for `Phoenix.LiveView.Router.live_session/3`. The locale of each live session is added to the session it produces.
+
+  ### Returns
+
+  * One `Phoenix.LiveView.Router.live_session/3` definition per locale known to the Gettext backend, each holding the block's routes for that locale.
+
+  * Raises `ArgumentError` at compile time when `options` is not a keyword list, or when a route in the block is not inside a `localize` block.
+
+  ### Examples
+
+      localize_live_session :default, on_mount: [MyAppWeb.LocaleLive] do
+        scope "/", MyAppWeb do
+          localize do
+            live "/\#{locale}/video", VideoLive
+            live "/\#{locale}/audio", AudioLive
+          end
+        end
+      end
+
+  Live routes that are not localized belong in a separate `live_session/3`. A navigation between them and a localized route is then a full page load.
+
+  """
+  @doc since: "1.2.0"
+  defmacro localize_live_session(name, options \\ [], do: block) when is_atom(name) do
+    gettext_backend = Module.get_attribute(__CALLER__.module, :_gettext_backend)
+
+    if not Keyword.keyword?(options) do
+      raise ArgumentError,
+            "localize_live_session/3 expects its options as a keyword list, got: " <>
+              Macro.to_string(options)
+    end
+
+    live_sessions =
+      for locale_id <- locales_from_gettext(gettext_backend),
+          {:ok, locale} <- [Localize.validate_locale(locale_id)],
+          match?({:ok, _}, Localize.Locale.gettext_locale_id(locale, gettext_backend)) do
+        session_locale = Localize.LanguageTag.to_string(locale)
+
+        session =
+          quote do
+            {Localize.Routes, :__live_session__,
+             [unquote(session_locale), unquote(Keyword.get(options, :session))]}
+          end
+
+        quote location: :keep do
+          require Phoenix.LiveView.Router
+
+          Phoenix.LiveView.Router.live_session unquote(:"#{name}_#{locale_id}"),
+                                               unquote(Keyword.put(options, :session, session)) do
+            unquote(restrict_to_locale(block, locale_id))
+          end
+        end
+      end
+
+    {:__block__, [], live_sessions}
+  end
+
+  @doc false
+  # The session of a live session made by `localize_live_session/3`:
+  # the caller's own `:session`, if any, with the locale added.
+  def __live_session__(conn, locale, session) do
+    session =
+      case session do
+        {module, function, args} -> apply(module, function, [conn | args])
+        %{} = session -> session
+        nil -> %{}
+      end
+
+    Map.put(session, Localize.Plug.PutLocale.session_key(), locale)
   end
 
   # Expands one locale into a `localize/2` call carrying both the
@@ -395,6 +512,43 @@ defmodule Localize.Routes do
   end
 
   @doc false
+  # The locale whose localized routes serve `locale`: `locale` itself
+  # when routes exist for it, otherwise the default locale, otherwise the
+  # first locale that has routes. A locale can be valid without routes
+  # when it is supported but has no Gettext translations, and
+  # `Localize.Plug.PutLocale` accepts such a locale. This runs on the
+  # render path for every `~q` link and localized helper, so an invalid
+  # locale falls back like one without routes rather than raising.
+  def route_locale(%Localize.LanguageTag{cldr_locale_id: id} = locale, locale_ids) do
+    # `~q` runs for every link, and the current locale usually has routes
+    if id in locale_ids, do: locale, else: validated_route_locale(locale, locale_ids)
+  end
+
+  def route_locale(locale, locale_ids), do: validated_route_locale(locale, locale_ids)
+
+  defp validated_route_locale(locale, locale_ids) do
+    case Localize.validate_locale(locale) do
+      {:ok, %{cldr_locale_id: id} = locale} ->
+        if id in locale_ids, do: locale, else: fallback_route_locale(locale_ids)
+
+      {:error, _invalid} ->
+        fallback_route_locale(locale_ids)
+    end
+  end
+
+  defp fallback_route_locale(locale_ids) do
+    default = Localize.default_locale()
+
+    with false <- default.cldr_locale_id in locale_ids,
+         [first | _rest] <- locale_ids,
+         {:ok, first} <- Localize.validate_locale(first) do
+      first
+    else
+      _default_has_routes_or_none_do -> default
+    end
+  end
+
+  @doc false
   def interpolate_and_translate_path(path, locale, gettext_backend) do
     {:ok, gettext_locale} = Localize.Locale.gettext_locale_id(locale, gettext_backend)
 
@@ -448,8 +602,6 @@ defmodule Localize.Routes do
     {:<<>>, meta, merge_literals(segments)}
   end
 
-  defp merge_literal_segments(other), do: other
-
   defp merge_literals([first, second | rest]) when is_binary(first) and is_binary(second) do
     merge_literals([first <> second | rest])
   end
@@ -458,42 +610,40 @@ defmodule Localize.Routes do
   defp merge_literals([]), do: []
 
   @doc false
-  def translate_path_now(path, locale, gettext_locale, gettext_backend) do
-    Macro.prewalk(path, fn segment ->
-      translate_segment_now(locale, gettext_locale, gettext_backend, segment)
-    end)
-  end
+  # Only literal path segments are translated. Once a query or fragment
+  # begins, the rest of the route, including later literal segments, is
+  # left as is. Code inside `#{...}` is never walked.
+  def translate_path_now({:<<>>, meta, segments}, locale, gettext_locale, gettext_backend) do
+    {segments, _in_query?} =
+      Enum.map_reduce(segments, false, fn
+        segment, false when is_binary(segment) ->
+          translate_segment_now(locale, gettext_locale, gettext_backend, segment)
 
-  defp translate_segment_now(_locale, _gettext_locale, _backend, "" = segment), do: segment
+        segment, in_query? ->
+          {segment, in_query?}
+      end)
+
+    {:<<>>, meta, segments}
+  end
 
   defp translate_segment_now(_locale, _gettext_locale, _backend, @interpolate <> _rest = segment),
-    do: segment
+    do: {segment, false}
 
-  defp translate_segment_now(_locale, _gettext_locale, _backend, segment)
-       when not is_binary(segment),
-       do: segment
+  defp translate_segment_now(locale, gettext_locale, gettext_backend, segment) do
+    case :binary.match(segment, ["?", "#"]) do
+      :nomatch ->
+        {translate_segment_parts(segment, locale, gettext_locale, gettext_backend), false}
 
-  defp translate_segment_now(locale, gettext_locale, gettext_backend, segment)
-       when is_binary(segment) do
-    segment
+      {start, _length} ->
+        {path, query} = :erlang.split_binary(segment, start)
+        {translate_segment_parts(path, locale, gettext_locale, gettext_backend) <> query, true}
+    end
+  end
+
+  defp translate_segment_parts(path, locale, gettext_locale, gettext_backend) do
+    path
     |> String.split("/")
-    |> translate_segment_parts(locale, gettext_locale, gettext_backend)
-    |> Enum.join("/")
-  end
-
-  defp translate_segment_parts([last_part], locale, gettext_locale, gettext_backend) do
-    [last_part | rest] = Regex.split(~r/[#\?]/, last_part, include_captures: true)
-
-    [translate_segment_part(last_part, locale, gettext_locale, gettext_backend) | rest]
-    |> :erlang.iolist_to_binary()
-    |> List.wrap()
-  end
-
-  defp translate_segment_parts([part | rest], locale, gettext_locale, gettext_backend) do
-    [
-      translate_segment_part(part, locale, gettext_locale, gettext_backend)
-      | translate_segment_parts(rest, locale, gettext_locale, gettext_backend)
-    ]
+    |> Enum.map_join("/", &translate_segment_part(&1, locale, gettext_locale, gettext_backend))
   end
 
   defp translate_segment_part("", _locale, _gettext_locale, _backend), do: ""
@@ -652,6 +802,63 @@ defmodule Localize.Routes do
     nil
   end
 
+  # A localized live route in more than one locale, outside
+  # `localize_live_session/3`: a live navigation between its locales
+  # would keep the locale of the page it started from.
+  defp warn_live_route(route, env) do
+    {:live, _meta, [path | _args]} = route
+
+    IO.warn(
+      "live #{Macro.to_string(path)} is localized for more than one locale outside " <>
+        "localize_live_session/3. A live navigation between its locales keeps the " <>
+        "locale of the page it started from. Define it in localize_live_session/3.",
+      Macro.Env.stacktrace(env)
+    )
+  end
+
+  # Rewrites the routes of a `localize_live_session/3` block for one
+  # locale: each `localize` block generates that locale only, and is
+  # dropped when it names other locales. A route outside `localize` would
+  # be defined once per locale, so it raises.
+  defp restrict_to_locale({:localize, meta, [[do: _] = block]}, locale_id) do
+    {:localize, meta, [[locale_id], block]}
+  end
+
+  defp restrict_to_locale({:localize, meta, [locales, [do: _] = block]}, locale_id) do
+    if locale_id in cldr_locale_ids(locales) do
+      {:localize, meta, [[locale_id], block]}
+    end
+  end
+
+  defp restrict_to_locale({verb, _meta, [path | _args]}, _locale_id)
+       when verb in @localizable_verbs do
+    raise ArgumentError,
+          "#{verb} #{Macro.to_string(path)} in localize_live_session/3 is not inside " <>
+            "localize/1 or localize/2. Move it inside a localize block, or into a " <>
+            "separate live_session/3."
+  end
+
+  defp restrict_to_locale({form, meta, args}, locale_id) when is_list(args) do
+    {form, meta, Enum.map(args, &restrict_to_locale(&1, locale_id))}
+  end
+
+  defp restrict_to_locale({key, value}, locale_id) do
+    {key, restrict_to_locale(value, locale_id)}
+  end
+
+  defp restrict_to_locale(list, locale_id) when is_list(list) do
+    Enum.map(list, &restrict_to_locale(&1, locale_id))
+  end
+
+  defp restrict_to_locale(other, _locale_id), do: other
+
+  defp cldr_locale_ids(locales) do
+    for locale <- List.wrap(locales),
+        {:ok, %{cldr_locale_id: locale_id}} <- [Localize.validate_locale(locale)] do
+      locale_id
+    end
+  end
+
   @doc false
   def add_to_route(args, field, key, value) do
     case Enum.reverse(args) do
@@ -706,6 +913,13 @@ defmodule Localize.Routes do
 
   defp put_value({:%{}, meta, key_values}, key, value) do
     {:%{}, meta, [{key, Macro.escape(value)} | key_values]}
+  end
+
+  # A map known only at runtime, such as `private: @route_private`.
+  defp put_value(map, key, value) do
+    quote do
+      Map.put(unquote(map), unquote(key), unquote(Macro.escape(value)))
+    end
   end
 
   defp canonical_route({verb, meta, [path, controller, action | _args]}) when is_atom(action) do

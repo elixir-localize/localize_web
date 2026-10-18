@@ -142,6 +142,8 @@ The `localize` macro supports all standard Phoenix route macros:
 * `resources` (including nested resources)
 * `live`
 
+Localized `live` routes belong inside `localize_live_session/3` so that a live navigation to another locale reloads the page in that locale. See "Localized live routes" in the [HTTP locale discovery guide](http-locale-discovery.md).
+
 ## Nested Resources
 
 Nested resources are fully supported. Each level is localized independently:

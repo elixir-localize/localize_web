@@ -2,7 +2,7 @@ defmodule Localize.AcceptLanguage do
   @moduledoc """
   Parses HTTP `Accept-Language` headers and finds the best matching locale.
 
-  The `Accept-Language` header is parsed per [RFC 2616](https://www.rfc-editor.org/rfc/rfc2616#section-14.4) into quality-tagged language tags which are then matched against available locales using `Localize.validate_locale/1`. The primary entry point is `best_match/1` which returns the highest-quality successfully validated locale.
+  The `Accept-Language` header is parsed per [RFC 2616](https://www.rfc-editor.org/rfc/rfc2616#section-14.4) into quality-tagged language tags which are then matched against the supported locales. The primary entry point is `best_match/1` which returns the highest-quality tag that matches a supported locale.
 
   """
 
@@ -16,7 +16,7 @@ defmodule Localize.AcceptLanguage do
 
   ### Returns
 
-  * A list of `{quality, language_tag_string}` tuples.
+  * A list of `{quality, language_tag_string}` tuples. A `header` that is not a string has no tags.
 
   ### Examples
 
@@ -24,7 +24,7 @@ defmodule Localize.AcceptLanguage do
       [{1.0, "en-us"}, {0.9, "en"}, {0.8, "fr"}]
 
   """
-  @spec tokenize(String.t()) :: [{float(), String.t()}]
+  @spec tokenize(term()) :: [{float(), String.t()}]
   def tokenize(header) when is_binary(header) do
     header
     |> String.downcase()
@@ -39,6 +39,8 @@ defmodule Localize.AcceptLanguage do
     |> Enum.sort_by(fn {quality, _tag} -> quality end, :desc)
   end
 
+  def tokenize(_header), do: []
+
   @doc """
   Parses an `Accept-Language` header and validates each language tag
   against known locales.
@@ -50,7 +52,9 @@ defmodule Localize.AcceptLanguage do
   ### Returns
 
   * `{:ok, [{quality, result}]}` where `result` is either
-    `{:ok, Localize.LanguageTag.t()}` or `{:error, reason}`.
+    `{:ok, Localize.LanguageTag.t()}` or `{:error, reason}`, or
+
+  * `{:error, exception}` when `header` is not a string.
 
   ### Examples
 
@@ -59,8 +63,9 @@ defmodule Localize.AcceptLanguage do
       2
 
   """
-  @spec parse(String.t()) ::
+  @spec parse(term()) ::
           {:ok, [{float(), {:ok, Localize.LanguageTag.t()} | {:error, term()}}]}
+          | {:error, Exception.t()}
   def parse(header) when is_binary(header) do
     results =
       header
@@ -72,11 +77,15 @@ defmodule Localize.AcceptLanguage do
     {:ok, results}
   end
 
+  def parse(header), do: {:error, invalid_header(header)}
+
   @doc """
   Returns the best matching locale for the given `Accept-Language` header.
 
-  Parses the header, validates each language tag, and returns the
-  highest-quality successfully validated locale.
+  Parses the header and returns the highest-quality language tag that
+  matches a supported locale. A tag that only resolves to a supported
+  locale by fallback, such as `ja` when no Japanese locale is supported,
+  is skipped in favour of the next tag in the header.
 
   ### Arguments
 
@@ -86,7 +95,7 @@ defmodule Localize.AcceptLanguage do
 
   * `{:ok, Localize.LanguageTag.t()}` or
 
-  * `{:error, Localize.NoMatchingLocaleError.t()}`
+  * `{:error, exception}`: a `Localize.UnknownLocaleError` when no tag matches a supported locale, or a `Localize.InvalidValueError` when `header` is not a string.
 
   ### Examples
 
@@ -95,21 +104,13 @@ defmodule Localize.AcceptLanguage do
       "en"
 
   """
-  @spec best_match(String.t()) ::
+  @spec best_match(term()) ::
           {:ok, Localize.LanguageTag.t()} | {:error, Exception.t()}
   def best_match(header) when is_binary(header) do
     result =
       header
       |> tokenize()
-      |> Enum.find_value(fn {_quality, tag} ->
-        case Localize.validate_locale(tag) do
-          {:ok, %Localize.LanguageTag{cldr_locale_id: id} = locale} when not is_nil(id) ->
-            locale
-
-          _other ->
-            nil
-        end
-      end)
+      |> Enum.find_value(fn {_quality, tag} -> supported_match(tag) end)
 
     case result do
       %Localize.LanguageTag{} = locale ->
@@ -117,6 +118,39 @@ defmodule Localize.AcceptLanguage do
 
       nil ->
         {:error, Localize.UnknownLocaleError.exception(locale_id: header)}
+    end
+  end
+
+  def best_match(header), do: {:error, invalid_header(header)}
+
+  defp invalid_header(header) do
+    Localize.InvalidValueError.exception(
+      value: header,
+      expected: "an Accept-Language header string"
+    )
+  end
+
+  # `Localize.validate_locale/1` never rejects a valid tag: with no close
+  # supported locale it falls back to the first one (`ja` resolves to
+  # `de-CH` data when only `de-CH` and `en-CH` are supported). A distance
+  # of 80 means unrelated languages, so a match within 79 keeps every
+  # CLDR match (`en-US` to `en-CH`, `gsw` to `de-CH`) and skips the
+  # fallback. When CLDR matches across languages, the supported locale
+  # is returned, so its language is the one being served.
+  @max_match_distance 79
+
+  defp supported_match(tag) do
+    with {:ok, requested} <- Localize.validate_locale(tag),
+         {:ok, locale_id, _distance} <-
+           Localize.LanguageTag.best_match(
+             requested,
+             [requested.cldr_locale_id],
+             @max_match_distance
+           ),
+         {:ok, served} <- Localize.validate_locale(locale_id) do
+      if served.language == requested.language, do: requested, else: served
+    else
+      _no_match -> nil
     end
   end
 

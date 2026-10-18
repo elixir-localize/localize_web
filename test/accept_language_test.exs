@@ -262,19 +262,34 @@ defmodule Localize.AcceptLanguageTest do
                AcceptLanguage.best_match("fr-CH,fr;q=0.9,en;q=0.8,de;q=0.7")
     end
 
-    test "handles Romanian with English variants" do
+    test "skips unsupported Romanian and matches en-us" do
       {:ok, locale} = AcceptLanguage.best_match("ro-RO,ro;q=0.8,en-us;q=0.6,en-gb;q=0.4,en;q=0.2")
-      assert locale.language == :ro
+      assert %{language: :en, territory: :US, cldr_locale_id: :en} = locale
     end
 
-    test "handles Polish with German and English fallback" do
+    test "skips unsupported Polish and matches de-DE" do
       {:ok, locale} = AcceptLanguage.best_match("pl,de-DE;q=0.9,de;q=0.8,en;q=0.7")
-      assert locale.language == :pl
+      assert %{language: :de, territory: :DE, cldr_locale_id: :de} = locale
     end
 
-    test "handles es-419 Latin American Spanish" do
+    test "skips unsupported es-419 and es and matches en" do
       {:ok, locale} = AcceptLanguage.best_match("es-419,es;q=0.9,en;q=0.8")
-      assert locale.language == :es
+      assert %{language: :en, cldr_locale_id: :en} = locale
+    end
+
+    test "skips unsupported es-ES and matches fr-CH to fr" do
+      {:ok, locale} = AcceptLanguage.best_match("es-ES,fr-CH;q=0.9,en;q=0.8")
+      assert %{language: :fr, territory: :CH, cldr_locale_id: :fr} = locale
+    end
+
+    test "returns the supported locale when CLDR matches gsw-CH to de" do
+      {:ok, locale} = AcceptLanguage.best_match("gsw-CH,fr;q=0.9")
+      assert %{language: :de, cldr_locale_id: :de} = locale
+    end
+
+    test "returns an error when pt-BR and ko match no supported locale" do
+      assert {:error, %Localize.UnknownLocaleError{}} =
+               AcceptLanguage.best_match("pt-BR,ko;q=0.9")
     end
 
     test "handles header with low self-rating" do
@@ -291,7 +306,7 @@ defmodule Localize.AcceptLanguageTest do
       header = "es-ES,es;q=0.9,en-US;q=0.8,en;q=0.7,es-MX;q=0.6"
 
       {:ok, locale} = AcceptLanguage.best_match(header)
-      assert locale.language == :es
+      assert %{language: :en, territory: :US, cldr_locale_id: :en} = locale
     end
 
     test "handles empty string" do

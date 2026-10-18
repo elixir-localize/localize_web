@@ -287,9 +287,11 @@ config :localize_web, :mf2_markup,
   )
 ```
 
-### Unknown tags raise
+### Unknown tags and unrenderable messages
 
-If a translator writes `{#weird}…{/weird}` and `weird` isn't registered, the component raises `Localize.HTML.Message.UnknownMarkupError` listing the tag and the registered tag names. This is intentional — silent fallbacks hide translator mistakes.
+If a translator writes `{#weird}…{/weird}` and `weird` isn't registered, the component and `t/1` render the tag's children without it and log a warning naming the tag and the registered tag names. A message that cannot be formatted at all, such as a translation with invalid MF2 syntax, logs a warning and renders its source text, escaped. One translator mistake shows up in the logs rather than taking down the page.
+
+`Localize.HTML.Message.render_to_safe/3` returns the error instead — `{:error, %Localize.HTML.Message.UnknownMarkupError{}}` for an unknown tag — so a test or a pipeline can check for it.
 
 ## Choosing between `~t`, `t/1`, and `<.message>`
 

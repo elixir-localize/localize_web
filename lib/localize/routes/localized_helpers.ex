@@ -29,7 +29,8 @@ defmodule Localize.Routes.LocalizedHelpers do
     groups = Enum.group_by(routes, fn {route, _exprs} -> route.helper end)
 
     docs = Keyword.get(opts, :docs, true)
-    localized_helpers = localized_helpers(groups)
+    locale_ids = Localize.Routes.locales_from_gettext(gettext_backend)
+    localized_helpers = localized_helpers(groups, locale_ids)
     non_localized_helpers = non_localized_helpers(groups, helper_module)
     delegate_helpers = delegate_helpers(groups, helper_module, gettext_backend)
     other_delegates = other_delegates(helper_module)
@@ -55,7 +56,7 @@ defmodule Localize.Routes.LocalizedHelpers do
     Module.create(localized_helper_module, code, line: env.line, file: env.file)
   end
 
-  defp localized_helpers(groups) do
+  defp localized_helpers(groups, locale_ids) do
     seen = :sets.new()
 
     {helpers, _} =
@@ -90,7 +91,7 @@ defmodule Localize.Routes.LocalizedHelpers do
               plug_opts,
               unquote_splicing(vars)
             ) do
-          locale = Localize.get_locale()
+          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(locale_ids))
 
           helper(
             unquote(helper_fun_name),
@@ -109,7 +110,7 @@ defmodule Localize.Routes.LocalizedHelpers do
               unquote_splicing(vars),
               params
             ) do
-          locale = Localize.get_locale()
+          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(locale_ids))
 
           helper(
             unquote(helper_fun_name),
@@ -505,10 +506,17 @@ defmodule Localize.Routes.LocalizedHelpers do
 
   * `{:error, exception}`.
 
+  Anything other than a map, such as `nil`, generates no links.
+
   """
-  @spec hreflang_links(%{locale_name() => url()} | nil, keyword()) ::
+  @spec hreflang_links(%{locale_name() => url()} | term(), keyword()) ::
           {:ok, Phoenix.HTML.safe()} | {:error, Exception.t()}
-  defdelegate hreflang_links(url_map, options \\ []), to: Localize.HTML.Hreflang, as: :links
+  def hreflang_links(url_map, options \\ [])
+
+  def hreflang_links(url_map, options) when is_map(url_map) or is_nil(url_map),
+    do: Localize.HTML.Hreflang.links(url_map, options)
+
+  def hreflang_links(_url_map, _options), do: {:ok, {:safe, []}}
 
   @doc false
   def strip_locale(helper, locale)

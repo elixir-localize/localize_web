@@ -1,4 +1,4 @@
-defmodule Sigil_q.InterpolationTest do
+defmodule SigilQInterpolationTest do
   use ExUnit.Case, async: false
 
   # Regression coverage for the `#{locale}` / `#{language}` / `#{territory}`

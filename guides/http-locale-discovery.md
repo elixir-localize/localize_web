@@ -71,7 +71,7 @@ pipeline :browser do
   plug :accepts, ["html"]
   plug :fetch_session
   plug Localize.Plug.PutLocale,
-    from: [:session, :accept_language, :query, :path],
+    from: [:route, :path, :query, :session, :accept_language],
     param: "locale",
     gettext: MyAppWeb.Gettext
   plug Localize.Plug.PutSession
@@ -82,12 +82,19 @@ The Localize process locale is always set via `Localize.put_locale/1`. When a `:
 
 ### How Source Priority Works
 
-The `:from` option controls the order of locale source lookup. In this example:
+The `:from` option controls the order of locale source lookup. The example shows the default order, which applies when `:from` is omitted:
 
-1. The session is checked first (preserving the user's previous choice).
-2. The accept-language header is checked next.
+1. The locale of a localized route (e.g. `/fr/utilisateurs`) is checked first.
+
+2. Then path parameters (e.g. `/:locale/users`).
+
 3. Then query parameters (e.g. `?locale=fr`).
-4. Finally, path parameters.
+
+4. Then the session, which preserves the user's previous choice on pages whose URL carries no locale.
+
+5. Finally, the accept-language header, which gives first-time visitors a sensible default.
+
+A locale in the URL is an explicit choice, so it wins over the session and the browser. Put `:session` or `:accept_language` earlier only if a stored preference should override the URL.
 
 The first source that yields a valid locale wins. Remaining sources are not consulted.
 
@@ -256,10 +263,7 @@ In LiveView, the HTTP plug pipeline runs only on the initial page load. For subs
 ```elixir
 defmodule MyAppWeb.LocaleLive do
   def on_mount(:default, _params, session, socket) do
-    {:ok, _locale} = Localize.Plug.put_locale_from_session(
-      session,
-      gettext: MyAppWeb.Gettext
-    )
+    _ = Localize.Plug.put_locale_from_session(session, gettext: MyAppWeb.Gettext)
     {:cont, socket}
   end
 end
@@ -275,7 +279,32 @@ live_session :default, on_mount: [MyAppWeb.LocaleLive] do
 end
 ```
 
-The `put_locale_from_session/2` function reads the locale from the session (stored by `Localize.Plug.PutSession`) and sets it for both Localize and Gettext in the LiveView process.
+The `put_locale_from_session/2` function reads the locale from the session (stored by `Localize.Plug.PutSession`) and sets it for both Localize and Gettext in the LiveView process. Its result is not matched on: a first visit has no locale in the session, which returns `{:error, %Localize.Plug.NoSessionLocaleError{}}`, and the process keeps the default locale.
+
+### Localized live routes
+
+A live navigation mounts the next LiveView over the existing socket: no plug runs, the root layout (`<html lang>`, hreflang links) is not rendered again, and `on_mount` receives the session of the page the navigation started from. Inside a plain `live_session/3`, a live navigation from `/en/video` to `/fr/vidéo` therefore renders the French route in English.
+
+Define localized live routes with `localize_live_session/3` instead. It defines one live session per locale (`:default_en`, `:default_fr`, and so on) and adds that locale to each live session's session. LiveView performs a full page load when a navigation crosses into another live session, so switching locale reloads the page and runs the plug pipeline, while navigation within one locale stays live:
+
+```elixir
+localize_live_session :default, on_mount: [MyAppWeb.LocaleLive] do
+  scope "/", MyAppWeb do
+    localize do
+      live "/#{locale}/video", VideoLive
+      live "/#{locale}/audio", AudioLive
+    end
+  end
+end
+
+live_session :unlocalized, on_mount: [MyAppWeb.LocaleLive] do
+  scope "/", MyAppWeb do
+    live "/dashboard", DashboardLive
+  end
+end
+```
+
+Every route inside `localize_live_session/3` must be inside a `localize` block; keep unlocalized live routes in their own `live_session/3`. A localized `live` route defined for more than one locale outside `localize_live_session/3` produces a compile-time warning.
 
 ## Accessing the Locale in Controllers and Views
 

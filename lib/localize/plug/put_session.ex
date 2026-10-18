@@ -17,7 +17,6 @@ defmodule Localize.Plug.PutSession do
   ### Examples
 
       plug Localize.Plug.PutLocale,
-        apps: [:localize, :gettext],
         from: [:path, :query],
         gettext: MyApp.Gettext
       plug Localize.Plug.PutSession, as: :string

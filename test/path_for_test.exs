@@ -50,6 +50,37 @@ defmodule PathFor.Test do
       assert path_for(:fr, "/users/:territory") == "/users_fr/fr"
     end
 
+    test "accepts a string, a regional variant and a language tag for :fr" do
+      {:ok, fr} = Localize.validate_locale("fr")
+
+      assert path_for("fr", "/users") == "/users_fr"
+      assert path_for(:"fr-CH", "/users") == "/users_fr"
+      assert path_for(fr, "/users") == "/users_fr"
+      assert path_for(Localize.LanguageTag.new!("fr-CH"), "/users") == "/users_fr"
+    end
+
+    test "renders the default locale's (:en) route for :ja, which has no routes" do
+      assert path_for(:ja, "/users/1/faces") == "/users/1/face"
+    end
+
+    test "renders the default locale's (:en) route for an invalid locale" do
+      for locale <- ["not a locale", "", :"", %{}, 42, String.duplicate("x", 5000)] do
+        assert path_for(locale, "/users/1/faces") == "/users/1/face"
+        assert url_for(locale, "/users/1/faces") == "http://localhost/users/1/face"
+      end
+    end
+
+    test "route_locale/2 falls back to the first locale with routes when the default has none" do
+      for locale <- [:ja, "not a locale", nil] do
+        assert Localize.Routes.route_locale(locale, [:fr, :de]).cldr_locale_id == :fr
+      end
+    end
+
+    test "route_locale/2 keeps a locale that has routes" do
+      assert Localize.Routes.route_locale(:de, [:fr, :de]).cldr_locale_id == :de
+      assert Localize.Routes.route_locale("fr-CH", [:fr, :de]).cldr_locale_id == :fr
+    end
+
     test "renders multiple locales in one template-style pass" do
       Localize.put_locale(:en)
 
@@ -68,6 +99,10 @@ defmodule PathFor.Test do
       assert url_for(:fr, "/users") == "http://localhost/users_fr"
       assert url_for(:de, "/users") == "http://localhost/users_de"
       assert url_for(:en, "/users") == "http://localhost/users"
+    end
+
+    test "renders the default locale's (:en) URL for :ja, which has no routes" do
+      assert url_for(:ja, "/users/1/faces") == "http://localhost/users/1/face"
     end
 
     test "supports interpolations" do

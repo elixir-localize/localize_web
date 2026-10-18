@@ -13,7 +13,7 @@ defmodule Localize.Plug.PutLocaleTest do
   describe "init/1" do
     test "default options" do
       options = PutLocale.init([])
-      assert options[:from] == [:session, :accept_language, :query, :path, :route]
+      assert options[:from] == [:route, :path, :query, :session, :accept_language]
       assert options[:param] == "locale"
       assert options[:gettext] == []
       # Default is deferred to request time to avoid loading CLDR data
@@ -314,6 +314,51 @@ defmodule Localize.Plug.PutLocaleTest do
       assert locale.cldr_locale_id == :de
     end
 
+    test "with the default order a query locale wins over the session and accept-language" do
+      conn =
+        :get
+        |> conn("/?locale=fr")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{PutLocale.session_key() => "ja"})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :fr
+    end
+
+    test "with the default order a route locale wins over the session and accept-language" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_private(:localize_locale, "fr")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{PutLocale.session_key() => "ja"})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :fr
+    end
+
+    test "with the default order the session wins over accept-language" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{PutLocale.session_key() => "ja"})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :ja
+    end
+
+    test "with the default order accept-language applies when nothing else is set" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_req_header("accept-language", "de")
+        |> init_test_session(%{})
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert conn.private[:localize_locale].cldr_locale_id == :de
+    end
+
     test "falls through to next source when first has no locale" do
       options = PutLocale.init(from: [:query, :accept_language])
 
@@ -325,6 +370,55 @@ defmodule Localize.Plug.PutLocaleTest do
 
       locale = conn.private[:localize_locale]
       assert locale.cldr_locale_id == :fr
+    end
+  end
+
+  describe "call/2 - Vary response header" do
+    defp vary_after(conn, from) do
+      conn
+      |> PutLocale.call(PutLocale.init(from: from))
+      |> get_resp_header("vary")
+    end
+
+    test "fr from accept-language sets Vary: accept-language" do
+      conn = conn(:get, "/") |> put_req_header("accept-language", "fr")
+      assert vary_after(conn, [:query, :accept_language]) == ["accept-language"]
+    end
+
+    test "de from the query after an empty cookie sets Vary: cookie only" do
+      conn = conn(:get, "/?locale=de") |> fetch_cookies()
+      assert vary_after(conn, [:cookie, :query, :accept_language]) == ["cookie"]
+    end
+
+    test "the default after an empty cookie and !!! accept-language sets both" do
+      conn = conn(:get, "/") |> fetch_cookies() |> put_req_header("accept-language", "!!!")
+      assert vary_after(conn, [:cookie, :accept_language]) == ["cookie, accept-language"]
+    end
+
+    test "de from the query sets no Vary" do
+      conn = conn(:get, "/?locale=de") |> put_req_header("accept-language", "fr")
+      assert vary_after(conn, [:query, :accept_language]) == []
+    end
+
+    test "accept-language is added to an existing Vary: Accept-Encoding once" do
+      conn =
+        conn(:get, "/")
+        |> put_req_header("accept-language", "fr")
+        |> put_resp_header("vary", "Accept-Encoding, Accept-Language")
+
+      assert vary_after(conn, [:accept_language]) == ["Accept-Encoding, Accept-Language"]
+
+      conn = put_resp_header(conn, "vary", "Accept-Encoding")
+      assert vary_after(conn, [:accept_language]) == ["Accept-Encoding, accept-language"]
+    end
+
+    test "an existing Vary: * is kept as is" do
+      conn =
+        conn(:get, "/")
+        |> put_req_header("accept-language", "fr")
+        |> put_resp_header("vary", "*")
+
+      assert vary_after(conn, [:accept_language]) == ["*"]
     end
   end
 

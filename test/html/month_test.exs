@@ -12,18 +12,26 @@ defmodule Localize.HTML.Month.Test do
     @moduledoc false
 
     def cldr_calendar_type, do: :hebrew
+
+    def days_in_month(_year, _month), do: 30
   end
 
   defmodule PersianCalendar do
     @moduledoc false
 
     def cldr_calendar_type, do: :persian
+
+    def days_in_month(_year, _month), do: 30
   end
 
   defmodule PlainCalendar do
     @moduledoc false
+
+    def days_in_month(_year, _month), do: 30
   end
 
+  # Minimal calendar modules: `days_in_month/2` is the `Calendar` callback
+  # the helper checks for, and `cldr_calendar_type/0` names CLDR's labels.
   @hebrew_calendar __MODULE__.HebrewCalendar
   @persian_calendar __MODULE__.PersianCalendar
   @plain_calendar __MODULE__.PlainCalendar

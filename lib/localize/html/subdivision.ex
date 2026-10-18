@@ -25,6 +25,8 @@ defmodule Localize.HTML.Subdivision do
           name: String.t()
         }
 
+  alias Localize.HTML.Options
+
   @omit_from_select_options [:territory, :locale, :mapper, :collator, :full_codes]
 
   @doc """
@@ -58,7 +60,7 @@ defmodule Localize.HTML.Subdivision do
 
   * A `t:Phoenix.HTML.safe/0` `<select>` tag, or
 
-  * `{:error, exception}` if the territory or locale is invalid.
+  * `{:error, exception}` when an option is invalid.
 
   ### Examples
 
@@ -73,10 +75,24 @@ defmodule Localize.HTML.Subdivision do
           select_options()
         ) :: Phoenix.HTML.safe() | {:error, Exception.t()}
 
-  def select(form, field, options \\ [])
+  def select(form, field, options \\ []) do
+    case validate_options(options) do
+      {:ok, options} ->
+        select_options =
+          options
+          |> Map.drop(@omit_from_select_options)
+          |> Map.to_list()
 
-  def select(form, field, options) when is_list(options) do
-    select(form, field, validate_options(options), options[:selected])
+        PhoenixHTMLHelpers.Form.select(
+          form,
+          field,
+          build_subdivision_options(options),
+          select_options
+        )
+
+      {:error, exception} ->
+        {:error, exception}
+    end
   end
 
   @doc """
@@ -88,7 +104,7 @@ defmodule Localize.HTML.Subdivision do
 
   * A list of `{name, code}` tuples, or
 
-  * `{:error, exception}` if the territory or locale is invalid.
+  * `{:error, exception}` when an option is invalid.
 
   ### Examples
 
@@ -97,59 +113,33 @@ defmodule Localize.HTML.Subdivision do
       {"Alabama", "al"}
 
   """
-  @spec subdivision_options(select_options()) :: list(tuple()) | {:error, term()}
+  @spec subdivision_options(select_options()) :: list(tuple()) | {:error, Exception.t()}
 
-  def subdivision_options(options \\ [])
-
-  def subdivision_options(options) when is_list(options) do
-    case validate_options(options) do
-      {:error, reason} -> {:error, reason}
-      options -> build_subdivision_options(options)
+  def subdivision_options(options \\ []) do
+    with {:ok, options} <- validate_options(options) do
+      build_subdivision_options(options)
     end
   end
 
-  defp select(_form, _field, {:error, reason}, _selected) do
-    {:error, reason}
-  end
-
-  defp select(form, field, options, _selected) do
-    select_options =
-      options
-      |> Map.drop(@omit_from_select_options)
-      |> Map.to_list()
-
-    PhoenixHTMLHelpers.Form.select(
-      form,
-      field,
-      build_subdivision_options(options),
-      select_options
-    )
-  end
-
   defp default_options do
-    Map.new(
+    %{
       territory: nil,
       locale: Localize.get_locale(),
       collator: &default_collator/1,
       mapper: &{&1.name, &1.subdivision_code},
       full_codes: false,
       selected: nil
-    )
+    }
   end
 
   defp validate_options(options) do
-    options = Map.new(options)
-
-    with options <- Map.merge(default_options(), options),
-         {:ok, options} <- validate_locale(options),
-         {:ok, options} <- validate_territory(options) do
-      options
-    end
-  end
-
-  defp validate_locale(%{locale: locale} = options) do
-    with {:ok, locale} <- Localize.validate_locale(locale) do
-      {:ok, Map.put(options, :locale, locale)}
+    with {:ok, options} <- Options.merge(options, default_options()),
+         {:ok, options} <- Options.locale(options),
+         {:ok, options} <- Options.one_of(options, :full_codes, [true, false]),
+         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.function(options, :mapper),
+         {:ok, options} <- Options.optional(options, :selected, &validate_selected/1) do
+      validate_territory(options)
     end
   end
 
@@ -163,10 +153,17 @@ defmodule Localize.HTML.Subdivision do
   end
 
   defp validate_territory(%{territory: territory} = options) do
-    with {:ok, territory} <- Localize.validate_territory(territory) do
+    with {:ok, territory} <- Options.code(territory, :territory, &Localize.validate_territory/1) do
       {:ok, Map.put(options, :territory, territory)}
     end
   end
+
+  # Either form of a subdivision code is accepted and passed to the select
+  # tag as is, so only its type is checked.
+  defp validate_selected(selected) when is_atom(selected) or is_binary(selected),
+    do: {:ok, selected}
+
+  defp validate_selected(selected), do: Options.invalid(selected, :subdivision)
 
   # ── Building the options ─────────────────────────────────────────
 

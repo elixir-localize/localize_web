@@ -17,7 +17,11 @@ defmodule Localize.HTML.Month do
           | {:selected, pos_integer()}
         ]
 
+  alias Localize.HTML.Options
+
   @omit_from_select_options [:months, :locale, :mapper, :collator, :calendar, :year, :style]
+
+  @styles [:wide, :abbreviated, :narrow]
 
   @doc """
   Generates an HTML select tag for a month name list that can be used with a `Phoenix.HTML.Form.t`.
@@ -32,9 +36,9 @@ defmodule Localize.HTML.Month do
 
   ### Options
 
-  * `:months` defines the list of month numbers to be displayed. The default is `1..12`.
+  * `:months` defines the list of month numbers, from 1 to 13, to be displayed. The default is `1..12`.
 
-  * `:calendar` is the calendar module from which the month names are derived. The default is `Calendar.ISO`, which renders Gregorian labels. If the calendar module exports `cldr_calendar_type/0`, the returned atom selects the CLDR calendar used for the labels (for example, `Cldr.Calendar.Hebrew` returns `:hebrew`). Calendars without that function fall back to Gregorian labels.
+  * `:calendar` is the calendar module from which the month names are derived. The default is `Calendar.ISO`, which renders Gregorian labels. If the calendar module exports `cldr_calendar_type/0`, the returned atom selects the CLDR calendar used for the labels (for example, `Calendrical.Hebrew` returns `:hebrew`). Calendars without that function fall back to Gregorian labels. Anything that is not a calendar module, including a CLDR calendar type such as `:hebrew`, returns an error.
 
   * `:year` is the year from which the number of months is derived. The default is the current year.
 
@@ -52,7 +56,9 @@ defmodule Localize.HTML.Month do
 
   ### Returns
 
-  * A `t:Phoenix.HTML.safe/0` select tag.
+  * A `t:Phoenix.HTML.safe/0` select tag, or
+
+  * `{:error, exception}` when an option is invalid.
 
   ### Examples
 
@@ -65,25 +71,19 @@ defmodule Localize.HTML.Month do
           select_options
         ) :: Phoenix.HTML.safe() | {:error, Exception.t()}
 
-  def select(form, field, options \\ [])
+  def select(form, field, options \\ []) do
+    case validate_options(options) do
+      {:ok, options} ->
+        select_options =
+          options
+          |> Map.drop(@omit_from_select_options)
+          |> Map.to_list()
 
-  def select(form, field, options) when is_list(options) do
-    do_select(form, field, validate_options(options))
-  end
+        PhoenixHTMLHelpers.Form.select(form, field, build_month_options(options), select_options)
 
-  defp do_select(_form, _field, {:error, reason}) do
-    {:error, reason}
-  end
-
-  defp do_select(form, field, options) do
-    month_options = build_month_options(options)
-
-    select_options =
-      options
-      |> Map.drop(@omit_from_select_options)
-      |> Map.to_list()
-
-    PhoenixHTMLHelpers.Form.select(form, field, month_options, select_options)
+      {:error, exception} ->
+        {:error, exception}
+    end
   end
 
   @doc """
@@ -99,37 +99,34 @@ defmodule Localize.HTML.Month do
 
   ### Returns
 
-  * A list of `{month_name, month_number}` tuples.
+  * A list of `{month_name, month_number}` tuples, or
+
+  * `{:error, exception}` when an option is invalid.
 
   """
   @spec month_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 
-  def month_options(options \\ [])
-
-  def month_options(options) when is_list(options) do
-    case validate_options(options) do
-      {:error, reason} -> {:error, reason}
-      options -> build_month_options(options)
+  def month_options(options \\ []) do
+    with {:ok, options} <- validate_options(options) do
+      build_month_options(options)
     end
   end
 
   defp validate_options(options) do
-    options = Map.new(options)
-
-    with options <- Map.merge(default_options(), options),
-         {:ok, options} <- validate_locale(options) do
-      options
-    end
-  end
-
-  defp validate_locale(%{locale: locale} = options) do
-    with {:ok, locale} <- Localize.validate_locale(locale) do
-      {:ok, Map.put(options, :locale, locale)}
+    with {:ok, options} <- Options.merge(options, default_options()),
+         {:ok, options} <- Options.locale(options),
+         {:ok, options} <- Options.one_of(options, :style, @styles),
+         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.function(options, :mapper),
+         {:ok, options} <- validate_calendar(options),
+         {:ok, options} <- validate_year(options),
+         {:ok, options} <- Options.optional(options, :selected, &validate_month/1) do
+      Options.list(options, :months, &validate_month/1)
     end
   end
 
   defp default_options do
-    Map.new(
+    %{
       months: Enum.to_list(1..12),
       locale: Localize.get_locale(),
       calendar: Calendar.ISO,
@@ -138,8 +135,26 @@ defmodule Localize.HTML.Month do
       collator: & &1,
       mapper: & &1,
       selected: nil
-    )
+    }
   end
+
+  # A calendar is a module implementing the `Calendar` behaviour. A CLDR
+  # calendar type such as `:hebrew` is not a calendar and is rejected.
+  defp validate_calendar(%{calendar: calendar} = options) do
+    if is_atom(calendar) and Code.ensure_loaded?(calendar) and
+         function_exported?(calendar, :days_in_month, 2) do
+      {:ok, options}
+    else
+      {:error, Localize.UnknownCalendarError.exception(calendar: calendar)}
+    end
+  end
+
+  defp validate_year(%{year: year} = options) when is_integer(year), do: {:ok, options}
+  defp validate_year(%{year: year}), do: Options.invalid(year, :year)
+
+  # No calendar has more than 13 months.
+  defp validate_month(month) when month in 1..13, do: {:ok, month}
+  defp validate_month(month), do: Options.invalid(month, :month)
 
   defp build_month_options(options) do
     months = Map.fetch!(options, :months)
@@ -182,18 +197,15 @@ defmodule Localize.HTML.Month do
     end
   end
 
-  defp calendar_type(calendar) when is_atom(calendar) do
-    cond do
-      calendar == Calendar.ISO -> :gregorian
-      function_exported?(calendar, :cldr_calendar_type, 0) -> calendar.cldr_calendar_type()
-      true -> :gregorian
+  defp calendar_type(calendar) do
+    if function_exported?(calendar, :cldr_calendar_type, 0) do
+      calendar.cldr_calendar_type()
+    else
+      :gregorian
     end
   end
-
-  defp calendar_type(_calendar), do: :gregorian
 
   defp calendar_style_key(:wide), do: :wide
   defp calendar_style_key(:abbreviated), do: :abbreviated
   defp calendar_style_key(:narrow), do: :narrow
-  defp calendar_style_key(_), do: :wide
 end

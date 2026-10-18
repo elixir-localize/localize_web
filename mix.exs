@@ -1,7 +1,7 @@
 defmodule LocalizeWeb.MixProject do
   use Mix.Project
 
-  @version "1.1.0"
+  @version "1.2.0"
 
   def project do
     [
@@ -17,6 +17,7 @@ defmodule LocalizeWeb.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
       deps: deps(),
+      test_coverage: [ignore_modules: coverage_ignore_modules()],
       dialyzer: [
         plt_add_apps: ~w(gettext phoenix phoenix_live_view phoenix_html)a,
         flags: [
@@ -77,6 +78,7 @@ defmodule LocalizeWeb.MixProject do
       groups_for_modules: [
         Plugs: [
           Localize.Plug,
+          Localize.Plug.NoSessionLocaleError,
           Localize.Plug.PutLocale,
           Localize.Plug.PutSession,
           Localize.Plug.AcceptLanguage,
@@ -118,7 +120,7 @@ defmodule LocalizeWeb.MixProject do
       {:phoenix_html, "~> 4.0"},
       {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_live_view, "~> 1.0", optional: true},
-      {:jason, "~> 1.0", optional: true},
+      {:lazy_html, ">= 0.1.0", only: :test},
       {:ex_doc, "~> 0.34", only: [:dev, :release], runtime: false},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false}
     ] ++ maybe_json_polyfill()
@@ -130,6 +132,24 @@ defmodule LocalizeWeb.MixProject do
     else
       [{:json_polyfill, "~> 0.2 or ~> 1.0"}]
     end
+  end
+
+  # Test fixtures from test/support, and the router modules Phoenix
+  # generates from them. Library code is never listed here.
+  defp coverage_ignore_modules do
+    [
+      ~r/^MyApp(Web)?\./,
+      MyAppWeb,
+      MyModule,
+      MyPlugRouter,
+      SimplePlugRouter,
+      Localize.Route.TestHelper,
+      FaceController,
+      NotLocalizedController,
+      PageController,
+      UserController,
+      VisageController
+    ]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]

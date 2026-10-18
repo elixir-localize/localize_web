@@ -14,6 +14,40 @@ All notable changes to this project will be documented in this file. This projec
 
 * **Breaking.** `Localize.Routes.LocalizedHelpers.hreflang_links/1` returns `{:ok, safe}` or `{:error, exception}` rather than the rendered HTML directly, and no longer emits an annotation it cannot validate. A locale that does not resolve returns `Localize.InvalidLocaleError`, and a URL that is not fully qualified returns `Localize.RelativeUrlError`. Both were previously emitted verbatim, and both are ignored silently by search engines and agents — a site annotated with `hreflang="es-SP"` or a relative `href` appears not to declare the variant at all, with nothing to indicate why. Locales are also rendered canonically, so `"es_MX"` becomes `"es-MX"`: the underscore validates but BCP 47 requires a hyphen.
 
+## [1.2.0] — 2026-09-27
+
+### Breaking changes
+
+* `Localize.Plug.PutLocale` now checks `[:route, :path, :query, :session, :accept_language]` by default, so a locale in the URL wins. The previous default put `:session` and `:accept_language` first, and a URL locale never took effect in a browser; pass `:from` to restore it. Closes #25.
+
+* `Localize.HTML.Message.render_to_safe/3` returns `{:error, exception}` for a message it cannot render, where it raised. The `<.message>` component and `Localize.HTML.t/2` log a warning and render the escaped source, or the children of an unknown markup tag, rather than raising.
+
+* `Localize.HTML.Month` returns `{:error, %Localize.UnknownCalendarError{}}` for a `:calendar` that is not a calendar module, such as the CLDR type `:hebrew`, and an error for an unknown `:style`, where both were silently rendered as Gregorian `:wide` names.
+
+* `Localize.HTML.Locale` lists the locales configured for Localize (`Localize.supported_locales/0`) by default, rather than every CLDR locale. Pass `:locales` to list others.
+
+### Added
+
+* `Localize.Routes.localize_live_session/3` defines one live session per locale, so a live navigation to another locale reloads the page in that locale rather than keeping the old one. A localized `live` route outside it now warns at compile time. Closes #24.
+
+* `Localize.Plug.PutLocale` sets a `vary` header for each request header it read to find the locale (`accept-language`, and `cookie` for `:session` and `:cookie`), so a shared cache stores one response per language. Thanks to @rubas for the PR (#21).
+
+### Fixed
+
+* The select helpers in `Localize.HTML` return `{:error, exception}` for any invalid option — a bad `:locale`, `:selected`, list, `:style`, `:collator` or `:mapper`, or options that are not a keyword list — where 201 such inputs raised. `Localize.HTML.Territory` no longer raises with its default options.
+
+* `Localize.AcceptLanguage`, `Localize.Plug.put_locale_from_session/2`, the `get_locale/1` functions, `locale_from_host/1` and `hreflang_links/1` return an error or `nil` for input of the wrong type, and the LiveView `on_mount` examples no longer match on a result a first visit cannot produce.
+
+* `Localize.AcceptLanguage.best_match/1` skips a tag that matches no supported locale and tries the next one. It previously returned the requested language carrying the first supported locale's data, so `es-ES,fr-CH;q=0.9` served the first supported locale rather than French. Thanks to @rubas for the PR (#19).
+
+* `~q`, `path_for/2`, `url_for/2` and the localized helpers render the default locale's route for a locale without localized routes, or an invalid one, where they raised. `path_for/2` and `url_for/2` also accept a string or `Localize.LanguageTag`. Thanks to @rubas for the PR (#22).
+
+* `~q` translates only the literal path, not a path inside the query string or a string literal inside `#{...}` code. Thanks to @rubas for the PR (#17).
+
+* Nested resources are translated when their parent `resources` has options such as `only:`, and a localized route accepts a module attribute as its `private:` option. Thanks to @rubas for the PRs (#18, #26).
+
+* `Localize.Plug.put_locale_from_session/2` returns a `Localize.Plug.NoSessionLocaleError` for an empty session, where it returned a tuple, and the `PutSession` example no longer passes the removed `:apps` option. Thanks to @rubas for the PRs (#20, #23).
+
 ## [1.1.0] — 2026-08-11
 
 ### Added
