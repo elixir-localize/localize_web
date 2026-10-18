@@ -52,11 +52,12 @@ defmodule PathFor.Test do
 
     test "accepts a string, a regional variant and a language tag for :fr" do
       {:ok, fr} = Localize.validate_locale("fr")
+      {:ok, fr_ch} = Localize.validate_locale("fr-CH")
 
       assert path_for("fr", "/users") == "/users_fr"
       assert path_for(:"fr-CH", "/users") == "/users_fr"
       assert path_for(fr, "/users") == "/users_fr"
-      assert path_for(Localize.LanguageTag.new!("fr-CH"), "/users") == "/users_fr"
+      assert path_for(fr_ch, "/users") == "/users_fr"
     end
 
     test "renders the default locale's (:en) route for :ja, which has no routes" do

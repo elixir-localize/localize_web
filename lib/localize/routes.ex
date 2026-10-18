@@ -519,20 +519,20 @@ defmodule Localize.Routes do
   # `Localize.Plug.PutLocale` accepts such a locale. This runs on the
   # render path for every `~q` link and localized helper, so an invalid
   # locale falls back like one without routes rather than raising.
-  def route_locale(%Localize.LanguageTag{cldr_locale_id: id} = locale, locale_ids) do
-    # `~q` runs for every link, and the current locale usually has routes
-    if id in locale_ids, do: locale, else: validated_route_locale(locale, locale_ids)
+  #
+  # A language tag is trusted as it stands, so a tag whose locale has no
+  # routes falls back without being validated again; a string or an atom,
+  # as `path_for/2` and `url_for/2` accept, is validated once and re-enters
+  # with the tag.
+  def route_locale(%Localize.LanguageTag{cldr_locale_id: id} = locale, locale_ids)
+      when not is_nil(id) do
+    if id in locale_ids, do: locale, else: fallback_route_locale(locale_ids)
   end
 
-  def route_locale(locale, locale_ids), do: validated_route_locale(locale, locale_ids)
-
-  defp validated_route_locale(locale, locale_ids) do
+  def route_locale(locale, locale_ids) do
     case Localize.validate_locale(locale) do
-      {:ok, %{cldr_locale_id: id} = locale} ->
-        if id in locale_ids, do: locale, else: fallback_route_locale(locale_ids)
-
-      {:error, _invalid} ->
-        fallback_route_locale(locale_ids)
+      {:ok, tag} -> route_locale(tag, locale_ids)
+      {:error, _invalid} -> fallback_route_locale(locale_ids)
     end
   end
 

@@ -200,10 +200,10 @@ iex> url_map = MyAppWeb.Router.LocalizedHelpers.page_links(conn, :show, "intro")
 %{"en" => "http://localhost/pages/intro", "fr" => "http://localhost/pages_fr/intro"}
 
 iex> MyAppWeb.Router.LocalizedHelpers.hreflang_links(url_map)
-{:safe, ...}  # Generates <link href="..." rel="alternate" hreflang="..."/> tags
+{:ok, {:safe, ...}}  # Generates <link href="..." rel="alternate" hreflang="..."/> tags
 ```
 
-Place the output of `hreflang_links/1` in your layout's `<head>` section to help search engines discover the localized versions of your pages.
+Place the HTML from `hreflang_links/1` in your layout's `<head>` section to help search engines discover the localized versions of your pages. It returns `{:error, exception}` rather than markup for a locale that does not resolve or a URL that is not fully qualified, both of which search engines ignore without saying so, so match on `{:ok, html}` where you render it.
 
 ## Verified Localized Routes with ~q
 

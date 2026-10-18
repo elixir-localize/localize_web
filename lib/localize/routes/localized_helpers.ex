@@ -355,9 +355,21 @@ defmodule Localize.Routes.LocalizedHelpers do
       in the `<head>` section of an HTML document to indicate the
       different language versions of a given page.
 
+      ### Arguments
+
+      * `url_map` is a map of locale to fully-qualified URL, as returned by
+        the generated `*_links` helpers.
+
+      ### Returns
+
+      * `{:ok, safe}` where `safe` is rendered HTML, or
+
+      * `{:error, exception}` for a locale that does not resolve or a URL
+        that is not fully qualified.
+
       """
       @spec hreflang_links(%{LocalizedHelpers.locale_name() => LocalizedHelpers.url()}) ::
-              Phoenix.HTML.safe()
+              {:ok, Phoenix.HTML.safe()} | {:error, Exception.t()}
 
       def hreflang_links(url_map) do
         Localize.Routes.LocalizedHelpers.hreflang_links(url_map)

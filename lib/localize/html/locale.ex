@@ -155,7 +155,7 @@ defmodule Localize.HTML.Locale do
       selected: nil,
       add_likely_subtags: false,
       compound_locale: false,
-      prefer: :default
+      prefer: :standard
     }
   end
 
