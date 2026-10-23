@@ -18,6 +18,8 @@ Phoenix integration for the [Localize](https://hex.pm/packages/localize) library
 
 * **[Verified Localized Routes](https://hexdocs.pm/localize_web/phoenix-localized-routing.html#verified-localized-routes-with-q)** — the `~q` sigil provides compile-time verified localized routes that dispatch to the correct translated path based on the current locale.
 
+* **[hreflang Annotations](https://hexdocs.pm/localize_web/phoenix-localized-routing.html#generating-hreflang-links)** — render validated `rel="alternate"` `hreflang` link sets from the generated route helpers, from verified routes, or from any map of locale to URL.
+
 * **[HTML Form Helpers](https://hexdocs.pm/localize_web/localized-html-helpers.html)** — generate `<select>` tags and option lists for currencies, territories, territory subdivisions, locales, units of measure, and months with localized display names.
 
 ## Installation

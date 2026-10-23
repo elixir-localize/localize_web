@@ -304,6 +304,15 @@ Localize.with_locale(:fr, fn -> ~q"/users" end)
 
 Use `path_for/2` for single-call locale forcing; use `Localize.with_locale/2` for whole-block temporary locale changes.
 
+For hreflang annotations there is no need to iterate the locales yourself. `hreflang_links/2` renders a route once per locale configured in the Gettext backend and returns the `<link rel="alternate" hreflang="...">` set for the page `<head>`, validating each locale and URL as `Localize.HTML.Hreflang.links/2` does:
+
+```elixir
+<%= case hreflang_links("/users") do %>
+  <% {:ok, links} -> %><%= links %>
+  <% {:error, _} -> %>
+<% end %>
+```
+
 ## Inspecting Localized Routes
 
 Localized routes are stored in a `LocalizedRoutes` submodule. You can inspect them with the `phx.routes` mix task:

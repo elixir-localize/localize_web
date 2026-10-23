@@ -92,19 +92,6 @@ defmodule Localize.HTML.Options do
   end
 
   @doc false
-  # Passes an atom or string code to a Localize validator.
-  #
-  # `Localize.Currency.validate_currency/1` and `Localize.validate_territory/1`
-  # in Localize 1.3.0 raise `FunctionClauseError` for other terms. This is
-  # fixed on Localize main; once that is on hex and required here, this
-  # check can go. See TODO.md.
-  def code(code, _expected, validator) when is_atom(code) or is_binary(code) do
-    validator.(code)
-  end
-
-  def code(code, expected, _validator), do: invalid(code, expected)
-
-  @doc false
   def invalid(value, expected, allowed \\ nil, label \\ nil) do
     {:error,
      InvalidValueError.exception(

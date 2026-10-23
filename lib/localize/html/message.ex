@@ -202,20 +202,8 @@ if Code.ensure_loaded?(Phoenix.Component) do
       end
     end
 
-    # `Localize.Message.format_to_safe_list/3` in Localize 1.3.0 raises for
-    # bindings that are neither a map nor a keyword list. This is fixed on
-    # Localize main; once that is on hex and required here, the bindings
-    # check can go. See TODO.md.
     defp format(msgid, bindings, options) when is_binary(msgid) do
-      if is_map(bindings) or (is_list(bindings) and Keyword.keyword?(bindings)) do
-        Localize.Message.format_to_safe_list(msgid, bindings, options)
-      else
-        {:error,
-         Localize.InvalidValueError.exception(
-           value: bindings,
-           expected: "a map or keyword list of bindings"
-         )}
-      end
+      Localize.Message.format_to_safe_list(msgid, bindings, options)
     end
 
     defp format(msgid, _bindings, _options) do

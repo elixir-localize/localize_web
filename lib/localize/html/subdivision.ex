@@ -153,7 +153,7 @@ defmodule Localize.HTML.Subdivision do
   end
 
   defp validate_territory(%{territory: territory} = options) do
-    with {:ok, territory} <- Options.code(territory, :territory, &Localize.validate_territory/1) do
+    with {:ok, territory} <- Localize.validate_territory(territory) do
       {:ok, Map.put(options, :territory, territory)}
     end
   end

@@ -2,17 +2,21 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] — 2026-10-24
+
+### Breaking changes
+
+* Requires `localize ~> 1.4`. Localize 1.4 returns `{:error, exception}` for a value of the wrong type, so the type checks `localize_web` carried ahead of its validators are removed; an invalid currency or territory is now reported as Localize reports it, `Localize.UnknownCurrencyError` or `Localize.UnknownTerritoryError`, where it was `Localize.InvalidValueError`.
+
+* `Localize.Routes.LocalizedHelpers.hreflang_links/1` returns `{:ok, safe}` or `{:error, exception}` rather than the rendered HTML, and no longer emits an annotation it cannot validate. A locale that does not resolve returns `Localize.InvalidLocaleError` and a URL that is not fully qualified returns `Localize.RelativeUrlError`; search engines ignore both silently, so the site appeared not to declare the variant at all.
 
 ### Added
 
-* `Localize.HTML.Hreflang.links/2` renders `rel="alternate"` `hreflang` annotations from a map of locale to URL, validating each locale and rendering it in canonical BCP 47 form. The key `"x-default"` designates the fallback variant and is emitted as supplied.
+* `Localize.HTML.Hreflang.links/2` renders `rel="alternate"` `hreflang` annotations from a map of locale to URL, validating each locale and rendering it in canonical BCP 47 form, so `"es_MX"` becomes `"es-MX"`. The key `"x-default"` designates the fallback variant and is emitted as supplied.
 
 * `hreflang_links/2` in `Localize.VerifiedRoutes` renders the annotation set for a route across every configured locale, so verified routes have the same support the generated helpers had.
 
 ### Changed
-
-* **Breaking.** `Localize.Routes.LocalizedHelpers.hreflang_links/1` returns `{:ok, safe}` or `{:error, exception}` rather than the rendered HTML directly, and no longer emits an annotation it cannot validate. A locale that does not resolve returns `Localize.InvalidLocaleError`, and a URL that is not fully qualified returns `Localize.RelativeUrlError`. Both were previously emitted verbatim, and both are ignored silently by search engines and agents — a site annotated with `hreflang="es-SP"` or a relative `href` appears not to declare the variant at all, with nothing to indicate why. Locales are also rendered canonically, so `"es_MX"` becomes `"es-MX"`: the underscore validates but BCP 47 requires a hyphen.
 
 * A `Localize.LanguageTag` given to `path_for/2`, `url_for/2` or `~q`, or found by the `:route` source of `Localize.Plug.PutLocale`, is used as it stands rather than validated again, so a tag whose locale has no routes takes the default locale's. Build tags with `Localize.validate_locale/1`.
 

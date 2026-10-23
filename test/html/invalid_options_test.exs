@@ -36,7 +36,7 @@ defmodule Localize.HTML.InvalidOptionsTest do
       end
 
       test "returns an error for invalid :collator and :mapper" do
-        for key <- [:collator, :mapper], value <- [nil, "x", &Function.identity/2] do
+        for key <- [:collator, :mapper], value <- [nil, "x", fn -> :wrong_arity end] do
           options = Keyword.put(unquote(base), key, value)
           assert_error(apply(unquote(module), unquote(options_fun), [options]), "#{key}")
         end

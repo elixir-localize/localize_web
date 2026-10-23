@@ -133,7 +133,7 @@ defmodule Localize.HTML.Currency do
   end
 
   defp validate_currency(currency) do
-    Options.code(currency, :currency, &Localize.Currency.validate_currency/1)
+    Localize.Currency.validate_currency(currency)
   end
 
   defp maybe_include_selected_currency(%{selected: nil} = options) do

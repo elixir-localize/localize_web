@@ -1,7 +1,7 @@
 defmodule LocalizeWeb.MixProject do
   use Mix.Project
 
-  @version "1.2.0"
+  @version "1.3.0"
 
   def project do
     [
@@ -97,7 +97,9 @@ defmodule LocalizeWeb.MixProject do
           Localize.HTML.Locale,
           Localize.HTML.Unit,
           Localize.HTML.Month,
-          Localize.HTML.Message
+          Localize.HTML.Message,
+          Localize.HTML.Hreflang,
+          Localize.RelativeUrlError
         ]
       ],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md", "Localize.AcceptLanguage"]
@@ -112,7 +114,7 @@ defmodule LocalizeWeb.MixProject do
 
   defp deps do
     [
-      {:localize, "~> 1.0"},
+      {:localize, "~> 1.4"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},

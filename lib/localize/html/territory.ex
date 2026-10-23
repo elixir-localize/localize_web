@@ -144,7 +144,7 @@ defmodule Localize.HTML.Territory do
   end
 
   defp validate_territory(territory) do
-    Options.code(territory, :territory, &Localize.validate_territory/1)
+    Localize.validate_territory(territory)
   end
 
   defp maybe_include_selected_territory(%{selected: nil} = options) do
