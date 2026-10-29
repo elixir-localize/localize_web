@@ -518,6 +518,9 @@ defmodule Localize.Routes do
       {:ok, %{cldr_locale_id: id}} when id not in @meta_locales -> true
       _ -> false
     end)
+    # Gettext locales that resolve to one locale id, such as "de" and "de_CH"
+    # with only "de-CH" supported, collapse to one tag. A `localize [:de]` route
+    # is then translated with "de", but its helpers and `~q` use "de_CH".
     |> Enum.map(fn {:ok, locale} -> locale.cldr_locale_id end)
     |> Enum.uniq()
     |> Enum.map(&Localize.validate_locale/1)
