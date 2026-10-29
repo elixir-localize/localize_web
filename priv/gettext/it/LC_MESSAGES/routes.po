@@ -1,3 +1,9 @@
 msgid ""
 msgstr ""
 "Language: it\n"
+
+msgid "pages"
+msgstr "pages_it"
+
+msgid "users"
+msgstr "users_it"

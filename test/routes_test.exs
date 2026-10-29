@@ -179,7 +179,7 @@ defmodule Localize.Routes.Test do
                "de" => "http://localhost/users_de/1",
                "en" => "http://localhost/users/1",
                "fr" => "http://localhost/users_fr/1",
-               "it-CH" => "http://localhost/users/1"
+               "it-CH" => "http://localhost/users_it/1"
              }
 
       assert header =~ ~s|hreflang="de"|
