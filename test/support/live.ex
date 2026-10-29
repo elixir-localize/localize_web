@@ -17,7 +17,7 @@ defmodule MyAppWeb.LocaleLive do
   def mount(_params, session, socket) do
     {:ok,
      assign(socket,
-       locale: Localize.get_locale().cldr_locale_id,
+       locale: Localize.LanguageTag.to_string(Localize.get_locale()),
        gettext: Gettext.get_locale(MyApp.Gettext),
        title: Gettext.dgettext(MyApp.Gettext, "routes", "video"),
        extra: session["extra"]

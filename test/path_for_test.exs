@@ -146,7 +146,7 @@ defmodule PathFor.Test do
       {:ok, safe} = hreflang_links("/users")
       html = Phoenix.HTML.safe_to_string(safe)
 
-      assert length(String.split(html, "rel=\"alternate\"")) - 1 == 3
+      assert length(String.split(html, "rel=\"alternate\"")) - 1 == 4
     end
   end
 end

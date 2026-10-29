@@ -386,9 +386,12 @@ defmodule Localize.Routes do
       for locale <- locales_from_gettext(gettext_backend),
           match?({:ok, _}, Localize.Locale.gettext_locale_id(locale, gettext_backend)) do
         # The session's name and its `localize` blocks take the locale id,
-        # as a router writes it.
+        # as a router writes it. The session takes the tag of the routes,
+        # which `localized_route/3` builds from the id, not the tag of the
+        # Gettext locale: Gettext "de" can resolve to the locale "de-CH".
         locale_id = locale.cldr_locale_id
-        session_locale = Localize.LanguageTag.to_string(locale)
+        {:ok, route_locale} = Localize.validate_locale(locale_id)
+        session_locale = Localize.LanguageTag.to_string(route_locale)
 
         session =
           quote do

@@ -7,6 +7,6 @@ import Config
 # `localize.download_locales` reads compile-time config and runs in
 # the default Mix env, so the list lives here rather than in test.exs.
 config :localize,
-  supported_locales: ~w(en fr de th ja ar zh zh-Hans zh-Hant)
+  supported_locales: ~w(en fr de it-CH th ja ar zh zh-Hans zh-Hant)
 
 import_config "#{Mix.env()}.exs"
