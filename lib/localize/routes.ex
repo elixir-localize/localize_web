@@ -386,12 +386,10 @@ defmodule Localize.Routes do
       for locale <- locales_from_gettext(gettext_backend),
           match?({:ok, _}, Localize.Locale.gettext_locale_id(locale, gettext_backend)) do
         # The session's name and its `localize` blocks take the locale id,
-        # as a router writes it. The session takes the tag of the routes,
-        # which `localized_route/3` builds from the id, not the tag of the
-        # Gettext locale: Gettext "de" can resolve to the locale "de-CH".
+        # as a router writes it. The session takes the id too, as the routes
+        # do: Gettext "de" can resolve to the locale "de-CH".
         locale_id = locale.cldr_locale_id
-        {:ok, route_locale} = Localize.validate_locale(locale_id)
-        session_locale = Localize.LanguageTag.to_string(route_locale)
+        session_locale = Atom.to_string(locale_id)
 
         session =
           quote do
@@ -511,8 +509,7 @@ defmodule Localize.Routes do
   @doc false
   # The language tags of the backend's Gettext locales, one for each locale
   # id, in the backend's order. Gettext names its locales as strings, so they
-  # are validated here, once, and the tags are what the router macros carry
-  # into the routes they generate.
+  # are validated here, once. The routes carry the tag of the locale id.
   def locales_from_gettext(gettext_backend) do
     gettext_backend
     |> Gettext.known_locales()

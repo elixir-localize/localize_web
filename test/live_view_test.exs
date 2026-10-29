@@ -45,11 +45,14 @@ defmodule Localize.LiveViewTest do
     end
 
     test "mounts a route of Gettext locale it in the route's locale it-CH" do
-      conn = get(build_conn(), "/it-ch/video")
-      assert text(html_response(conn, 200), "locale") == "it-CH"
+      conn = get(build_conn(), "/it-ch/video_it")
+      html = html_response(conn, 200)
+      assert text(html, "locale") == "it-CH"
+      assert text(html, "gettext") == "it"
 
       {:ok, _view, html} = live(conn)
       assert text(html, "locale") == "it-CH"
+      assert text(html, "gettext") == "it"
     end
 
     test "a live navigation within one locale stays live" do
