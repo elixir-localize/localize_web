@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] — 2026-10-30
+
+### Fixed
+
+* `Localize.Routes.localize_live_session/3` puts the route's locale into the live session, so a LiveView mounts in the locale of its route when the Gettext locale differs from the locale id: Gettext `it` serving `it-CH` mounted in `it`. The route tags are built from each locale id, so `~q`, `path_for/2`, `url_for/2` and the helpers carry the same tag as the route. Thanks to @rubas for the PR (#27).
+
 ## [1.3.0] — 2026-10-24
 
 ### Breaking changes
