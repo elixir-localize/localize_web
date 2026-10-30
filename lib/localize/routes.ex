@@ -508,8 +508,8 @@ defmodule Localize.Routes do
   @doc false
   # The language tags of the backend's Gettext locales, one for each locale
   # id, in the backend's order. Gettext names its locales as strings, so they
-  # are validated here, once, and the tags are what the router macros carry
-  # into the routes they generate.
+  # are validated here, and the tag of each locale id is what the router
+  # macros carry into the routes they generate.
   def locales_from_gettext(gettext_backend) do
     gettext_backend
     |> Gettext.known_locales()
@@ -518,8 +518,13 @@ defmodule Localize.Routes do
       {:ok, %{cldr_locale_id: id}} when id not in @meta_locales -> true
       _ -> false
     end)
+    # Warning: if two Gettext locales ("de", "de_CH") resolve to one locale id
+    # ("de-CH"), they share one route tag. A `localize [:de]` route then
+    # translates with "de", while its helpers and `~q` use "de_CH".
+    |> Enum.map(fn {:ok, locale} -> locale.cldr_locale_id end)
+    |> Enum.uniq()
+    |> Enum.map(&Localize.validate_locale/1)
     |> Enum.map(fn {:ok, locale} -> locale end)
-    |> Enum.uniq_by(& &1.cldr_locale_id)
   end
 
   @doc false

@@ -1,0 +1,42 @@
+msgid ""
+msgstr ""
+"Language: it\n"
+
+msgid "pages"
+msgstr "pages_it"
+
+msgid "users"
+msgstr "users_it"
+
+msgid "faces"
+msgstr "faces_it"
+
+msgid "eyes"
+msgstr "eyes_it"
+
+msgid "edit"
+msgstr "edit_it"
+
+msgid "objects"
+msgstr "objects_it"
+
+msgid "chapters"
+msgstr "chapters_it"
+
+msgid "comments"
+msgstr "comments_it"
+
+msgid "columns"
+msgstr "columns_it"
+
+msgid "kapitel"
+msgstr "kapitel_it"
+
+msgid "seite"
+msgstr "seite_it"
+
+msgid "login"
+msgstr "accesso"
+
+msgid "video"
+msgstr "video_it"
