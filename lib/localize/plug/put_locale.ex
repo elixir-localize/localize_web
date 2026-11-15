@@ -14,7 +14,7 @@ defmodule Localize.Plug.PutLocale do
 
   If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`.
 
-  The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. The plug adds them in a `vary` line of its own, and leaves any `vary` line already on the response as it is. This lets a shared cache store one response per language. A `{Module, function}` source that reads a request header must add its own `vary` value.
+  The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. The plug adds them in a `vary` line of its own, and leaves any `vary` line already on the response as it is. This lets a shared cache store one response per language. A `{Module, function}` source that reads a request header must add its own `vary` value. The `:vary` option turns the header off for an application that declares how its responses vary itself.
 
   ### Options
 
@@ -49,6 +49,8 @@ defmodule Localize.Plug.PutLocale do
 
   * `:param` is the name of the parameter to look for in the query, path, body, or cookie. The default is `"locale"`.
 
+  * `:vary` is `true` or `false`, and says whether the plug adds the `vary` header described above. The default is `true`. With `false` the plug adds none, and the application declares how its responses vary: for example where a cache inside the application keys on a request header the application derives from the session. A shared cache that is told nothing serves one visitor's language to another.
+
   ### Examples
 
       plug Localize.Plug.PutLocale,
@@ -59,6 +61,10 @@ defmodule Localize.Plug.PutLocale do
       plug Localize.Plug.PutLocale,
         from: [:route, :session, :accept_language],
         gettext: [MyApp.Gettext, MyOtherApp.Gettext]
+
+      plug Localize.Plug.PutLocale,
+        from: [:route, :session, :accept_language],
+        vary: false
 
   """
 
@@ -103,13 +109,14 @@ defmodule Localize.Plug.PutLocale do
     |> validate_param(options[:param])
     |> validate_gettext(options[:gettext])
     |> validate_default(options[:default])
+    |> validate_vary(options[:vary])
   end
 
   @doc false
   def call(conn, options) do
     {locale, consulted} = locale_from_params(conn, options[:from], options)
     locale = locale || default(conn, options)
-    conn = put_vary(conn, consulted)
+    conn = put_vary(conn, consulted, options[:vary])
 
     if locale do
       Localize.put_locale(locale)
@@ -299,7 +306,12 @@ defmodule Localize.Plug.PutLocale do
   # could have changed the locale, or it serves one language to everyone.
   # The fields go in a `vary` line of their own: a response may carry
   # several, so the lines other plugs set are neither read nor rewritten.
-  defp put_vary(conn, consulted) do
+  # With `vary: false` the application declares how its responses vary.
+  defp put_vary(conn, _consulted, false) do
+    conn
+  end
+
+  defp put_vary(conn, consulted, _vary) do
     fields =
       consulted
       |> Enum.flat_map(&vary_fields/1)
@@ -493,5 +505,18 @@ defmodule Localize.Plug.PutLocale do
     end)
 
     Keyword.put(options, :gettext, backends)
+  end
+
+  defp validate_vary(options, nil) do
+    Keyword.put(options, :vary, true)
+  end
+
+  defp validate_vary(options, vary) when is_boolean(vary) do
+    options
+  end
+
+  defp validate_vary(_options, vary) do
+    raise ArgumentError,
+          "Invalid :vary #{inspect(vary)} detected. :vary must be true or false"
   end
 end

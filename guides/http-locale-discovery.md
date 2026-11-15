@@ -133,6 +133,26 @@ plug Localize.Plug.PutLocale, default: :none
 plug Localize.Plug.PutLocale, default: {MyAppWeb.Locale, :resolve_default}
 ```
 
+### The `vary` response header
+
+The plug adds a `vary` response header naming each request header it read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. With the default `:from` and no locale in the URL, a response carries `vary: cookie` when the session holds a locale and `vary: cookie, accept-language` when it does not; a locale found in the route, the path or the query adds none.
+
+The header tells a shared cache which requests a stored response may be reused for. Plug's default `cache-control` is `max-age=0, private, must-revalidate`, which keeps a response out of shared caches, and there the header changes nothing.
+
+A cache that honours `vary: cookie` stores one response per visitor. To cache localized pages in a shared cache, leave `:session` and `:cookie` out of `:from` on those routes, so the plug declares `accept-language` alone:
+
+```elixir
+plug Localize.Plug.PutLocale, from: [:route, :path, :query, :accept_language]
+```
+
+An application that declares how its responses vary itself turns the plug's header off with `vary: false`. The default is `true`.
+
+```elixir
+plug Localize.Plug.PutLocale, vary: false
+```
+
+With `vary: false` the plug adds no `vary` header at all, and a shared cache that is told nothing serves one visitor's language to another.
+
 ### Avoiding Localize Calls at Compile Time
 
 Plug options in a Phoenix router pipeline are evaluated when the module compiles. This means any `Localize.*` function call in a plug option executes during `mix compile`, which forces the Localize application to boot inside the compiler's VM and load CLDR data into memory. On memory-constrained build environments (CI runners, Docker builders, Fly.io remote builders) this can cause the compilation to be killed with an out-of-memory error.

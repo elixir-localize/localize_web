@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. This projec
 
 ## [1.4.0] — Unreleased
 
+### Added
+
+* `Localize.Plug.PutLocale` takes a `:vary` option. `vary: false` stops the plug adding a `vary` header, for an application that declares how its responses vary itself; the default is `true`.
+
 ### Changed
 
 * `Localize.Plug.PutLocale` adds its `vary` fields in a header line of its own, and no longer reads or rewrites a `vary` line already on the response. A response that already had one now carries two lines, which a recipient combines.

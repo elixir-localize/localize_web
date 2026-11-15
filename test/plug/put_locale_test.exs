@@ -19,6 +19,20 @@ defmodule Localize.Plug.PutLocaleTest do
       # Default is deferred to request time to avoid loading CLDR data
       # at compile time. The sentinel is resolved in call/2.
       assert options[:default] == :__localize_default__
+      assert options[:vary] == true
+    end
+
+    test "accepts true and false for :vary" do
+      assert PutLocale.init(vary: true)[:vary] == true
+      assert PutLocale.init(vary: false)[:vary] == false
+    end
+
+    test "raises on invalid :vary option" do
+      for invalid <- [:except_cookie, "false", 0, []] do
+        assert_raise ArgumentError, ~r/Invalid :vary/, fn ->
+          PutLocale.init(vary: invalid)
+        end
+      end
     end
 
     test "accepts valid :from option" do
@@ -474,6 +488,34 @@ defmodule Localize.Plug.PutLocaleTest do
         |> put_resp_header("vary", "Accept-Encoding")
 
       assert vary_after(conn, [:query, :accept_language]) == ["Accept-Encoding"]
+    end
+
+    test "vary: true is the default" do
+      conn = conn(:get, "/") |> fetch_cookies() |> put_req_header("accept-language", "fr")
+      options = PutLocale.init(from: [:cookie, :accept_language], vary: true)
+
+      assert conn |> PutLocale.call(options) |> get_resp_header("vary") ==
+               vary_after(conn, [:cookie, :accept_language])
+    end
+
+    test "vary: false adds no Vary and still sets the locale" do
+      conn = conn(:get, "/") |> fetch_cookies() |> put_req_header("accept-language", "fr")
+      options = PutLocale.init(from: [:cookie, :accept_language], vary: false)
+      conn = PutLocale.call(conn, options)
+
+      assert get_resp_header(conn, "vary") == []
+      assert conn.private[:localize_locale].cldr_locale_id == :fr
+    end
+
+    test "vary: false leaves an existing Vary line as it is" do
+      conn =
+        conn(:get, "/")
+        |> put_req_header("accept-language", "fr")
+        |> put_resp_header("vary", "x-locale")
+
+      options = PutLocale.init(from: [:accept_language], vary: false)
+
+      assert conn |> PutLocale.call(options) |> get_resp_header("vary") == ["x-locale"]
     end
   end
 
