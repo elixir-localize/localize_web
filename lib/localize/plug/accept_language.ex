@@ -6,6 +6,10 @@ defmodule Localize.Plug.AcceptLanguage do
   The locale can be later retrieved by `Localize.Plug.AcceptLanguage.get_locale/1`. This plug is useful
   when you only need accept-language parsing without the full locale discovery pipeline of `Localize.Plug.PutLocale`.
 
+  The plug sets no `vary` response header, because it selects nothing: it records the locale and leaves its
+  use to the application. An application that chooses content from the result should send
+  `vary: accept-language`, so that a shared cache does not serve one visitor's language to another.
+
   ### Options
 
   * `:no_match_log_level` determines the logging level for the case when no matching locale is configured to meet the user's
