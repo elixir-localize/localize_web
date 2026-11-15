@@ -429,25 +429,51 @@ defmodule Localize.Plug.PutLocaleTest do
       assert vary_after(conn, [:query, :accept_language]) == []
     end
 
-    test "accept-language is added to an existing Vary: Accept-Encoding once" do
+    test "session and cookie sources name cookie once" do
+      conn =
+        conn(:get, "/")
+        |> init_test_session(%{})
+        |> fetch_cookies()
+        |> put_req_header("accept-language", "fr")
+
+      assert vary_after(conn, [:session, :cookie, :accept_language]) ==
+               ["cookie, accept-language"]
+    end
+
+    test "an existing Vary line is left as it is and a new line is added" do
       conn =
         conn(:get, "/")
         |> put_req_header("accept-language", "fr")
-        |> put_resp_header("vary", "Accept-Encoding, Accept-Language")
+        |> put_resp_header("vary", "Accept-Encoding")
 
-      assert vary_after(conn, [:accept_language]) == ["Accept-Encoding, Accept-Language"]
-
-      conn = put_resp_header(conn, "vary", "Accept-Encoding")
-      assert vary_after(conn, [:accept_language]) == ["Accept-Encoding, accept-language"]
+      assert vary_after(conn, [:accept_language]) == ["accept-language", "Accept-Encoding"]
     end
 
-    test "an existing Vary: * is kept as is" do
+    test "several existing Vary lines are all left as they are" do
+      conn =
+        conn(:get, "/")
+        |> put_req_header("accept-language", "fr")
+        |> prepend_resp_headers([{"vary", "origin"}, {"vary", "accept-encoding"}])
+
+      assert vary_after(conn, [:accept_language]) ==
+               ["accept-language", "origin", "accept-encoding"]
+    end
+
+    test "an existing Vary: * is left as it is" do
       conn =
         conn(:get, "/")
         |> put_req_header("accept-language", "fr")
         |> put_resp_header("vary", "*")
 
-      assert vary_after(conn, [:accept_language]) == ["*"]
+      assert vary_after(conn, [:accept_language]) == ["accept-language", "*"]
+    end
+
+    test "nothing is added when no consulted source reads a header" do
+      conn =
+        conn(:get, "/?locale=de")
+        |> put_resp_header("vary", "Accept-Encoding")
+
+      assert vary_after(conn, [:query, :accept_language]) == ["Accept-Encoding"]
     end
   end
 

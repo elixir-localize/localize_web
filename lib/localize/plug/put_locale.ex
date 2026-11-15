@@ -14,7 +14,7 @@ defmodule Localize.Plug.PutLocale do
 
   If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`.
 
-  The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. Existing `vary` values are kept. This lets a shared cache store one response per language. A `{Module, function}` source that reads a request header must add its own `vary` value.
+  The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. The plug adds them in a `vary` line of its own, and leaves any `vary` line already on the response as it is. This lets a shared cache store one response per language. A `{Module, function}` source that reads a request header must add its own `vary` value.
 
   ### Options
 
@@ -297,26 +297,23 @@ defmodule Localize.Plug.PutLocale do
 
   # A shared cache must key the response on every request header that
   # could have changed the locale, or it serves one language to everyone.
+  # The fields go in a `vary` line of their own: a response may carry
+  # several, so the lines other plugs set are neither read nor rewritten.
   defp put_vary(conn, consulted) do
-    existing =
-      conn
-      |> get_resp_header("vary")
-      |> Enum.flat_map(&String.split(&1, ","))
-      |> Enum.map(&String.trim/1)
-
-    known = Enum.map(existing, &String.downcase/1)
-
-    new =
+    fields =
       consulted
       |> Enum.flat_map(&vary_fields/1)
       |> Enum.uniq()
-      |> Enum.reject(&(&1 in known))
 
-    if new == [] or "*" in known do
-      conn
-    else
-      put_resp_header(conn, "vary", Enum.join(existing ++ new, ", "))
-    end
+    add_vary(conn, fields)
+  end
+
+  defp add_vary(conn, []) do
+    conn
+  end
+
+  defp add_vary(conn, [_ | _] = fields) do
+    prepend_resp_headers(conn, [{"vary", Enum.join(fields, ", ")}])
   end
 
   defp vary_fields(:accept_language), do: ["accept-language"]

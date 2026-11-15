@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — Unreleased
+
+### Changed
+
+* `Localize.Plug.PutLocale` adds its `vary` fields in a header line of its own, and no longer reads or rewrites a `vary` line already on the response. A response that already had one now carries two lines, which a recipient combines.
+
 ## [1.3.1] — 2026-10-30
 
 ### Fixed
