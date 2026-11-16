@@ -73,6 +73,28 @@ defmodule MyApp.LiveRouter do
       live("/live", LocaleLive)
     end
   end
+
+  # The session stores only a locale the visitor chose, so a locale taken
+  # from `accept-language` is not in the cookie when a LiveView connects.
+  pipeline :chosen do
+    plug(:fetch_session)
+    plug(Localize.Plug.PutLocale, gettext: MyApp.Gettext)
+    plug(Localize.Plug.PutSession, from: [:route, :path, :query, :body])
+  end
+
+  scope "/chosen", MyAppWeb do
+    pipe_through(:chosen)
+
+    live_session :cookie_only, on_mount: MyAppWeb.LocaleHook do
+      live("/cookie-only", LocaleLive)
+    end
+
+    live_session :handed,
+      on_mount: MyAppWeb.LocaleHook,
+      session: {Localize.Plug, :live_session_locale, []} do
+      live("/handed", LocaleLive)
+    end
+  end
 end
 
 defmodule MyApp.LiveEndpoint do

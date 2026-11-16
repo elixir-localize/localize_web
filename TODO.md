@@ -6,13 +6,17 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
 
-* [ ] **Document `cache-control: private` on a response that writes the session** — behind `plug_http_cache` a cacheable page that stores a chosen locale is itself stored, and the next visitor to choose is served it without the cookie, so their choice is lost. Sending such a response `private` fixes it (tested in `localize_cache_probe`, `/private-session`); say so in the `vary` section of the HTTP locale discovery guide.
+* [ ] **A well-formed locale that matches nothing resolves to the root locale** — `?locale=tlh` is taken as a hit by `PutLocale`, with the locale `und`, because `Localize.validate_locale/1` resolves a valid tag with no CLDR data to `:und` and documents that it does. It should end up as the default locale; decide whether that is fixed in Localize or by `PutLocale` treating the result as a miss.
 
 ## Deferred
 
-* [ ] **Store only a locale the visitor chose** — `Localize.Plug.PutSession` stores a locale inferred from `accept-language`, so every first visit sets a cookie, and Varnish and nginx then store none of those pages. Tried in `localize_cache_probe` (`/chosen`), where two new visitors share a copy behind every cache at the cost of one copy for each form of `accept-language`; parked until `PutLocale` records which source decided and a connected LiveView can be handed the resolved locale without the cookie session.
+* [ ] **Store only a chosen locale by default** — `Localize.Plug.PutSession` stores a locale from any source unless given `:from`, so an application gets the first-visit cookie until it opts out. Parked for 2.0: the new default breaks a LiveView in a live session that has not been given `Localize.Plug.live_session_locale/1`.
 
 ## Done
+
+* [x] **Store only a locale the visitor chose** — `Localize.Plug.PutSession` takes `:from`, `Localize.Plug.PutLocale.get_locale_source/1` says which source decided, and `Localize.Plug.live_session_locale/1` hands a connected LiveView the locale without the cookie. 2026-11-17, v1.4.0.
+
+* [x] **Document `cache-control: private` on a response that writes the session** — in the `vary` section of the HTTP locale discovery guide, with the cost of keying on a raw `accept-language`. 2026-11-17, v1.4.0.
 
 * [x] **`:vary` option on `PutLocale`** — `vary: false` turns the plug's `vary` header off, and the header is added in a line of its own without rewriting existing ones. 2026-11-17, v1.4.0.
 

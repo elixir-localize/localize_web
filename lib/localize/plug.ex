@@ -73,6 +73,43 @@ defmodule Localize.Plug do
     {:error, %NoSessionLocaleError{}}
   end
 
+  @doc """
+  Returns the locale `Localize.Plug.PutLocale` resolved for a request, as the session of a live session.
+
+  A connected LiveView cannot read the request, so it takes the locale from its session. This function is given as the `:session` of a `live_session`, where LiveView calls it with the `conn` of the request that renders the page and signs the result into that page. The locale then reaches `put_locale_from_session/2` in the `on_mount` callback without being written to the session cookie.
+
+  That matters when `Localize.Plug.PutSession` is told, with its `:from` option, to store only a locale the visitor chose: a locale inferred from the `accept-language` header is not in the cookie, and without this function the LiveView would mount in the default locale. `Localize.Routes.localize_live_session/3` passes the locale of a localized route the same way, so this function is for live sessions that are not localized.
+
+  ### Arguments
+
+  * `conn` is the `t:Plug.Conn.t/0` of the request, which `Localize.Plug.PutLocale` has already been through.
+
+  ### Returns
+
+  * A map holding the locale as a string under the key `put_locale_from_session/2` reads, or
+
+  * an empty map when no locale was set for the request.
+
+  ### Examples
+
+      live_session :default,
+        on_mount: [MyAppWeb.LocaleLive],
+        session: {Localize.Plug, :live_session_locale, []} do
+        live "/dashboard", DashboardLive
+      end
+
+  """
+  @spec live_session_locale(Plug.Conn.t()) :: %{optional(String.t()) => String.t()}
+  def live_session_locale(conn) do
+    case Localize.Plug.PutLocale.get_locale(conn) do
+      %Localize.LanguageTag{} = locale ->
+        %{@session_key => Localize.LanguageTag.to_string(locale)}
+
+      _other ->
+        %{}
+    end
+  end
+
   # A locale that Gettext has no translations for is a configuration
   # mismatch rather than an error: the locale is still set for Localize,
   # and only the Gettext locale is left alone.

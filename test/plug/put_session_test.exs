@@ -23,17 +23,17 @@ defmodule Localize.Plug.PutSessionTest do
   describe "init/1" do
     test "default options" do
       options = PutSession.init([])
-      assert options == %{as: :string}
+      assert options == %{as: :string, from: :all}
     end
 
     test "accepts :string format" do
       options = PutSession.init(as: :string)
-      assert options == %{as: :string}
+      assert options == %{as: :string, from: :all}
     end
 
     test "accepts :language_tag format" do
       options = PutSession.init(as: :language_tag)
-      assert options == %{as: :language_tag}
+      assert options == %{as: :language_tag, from: :all}
     end
 
     test "raises on invalid :as option" do
@@ -204,6 +204,125 @@ defmodule Localize.Plug.PutSessionTest do
       locale = conn2.private[:localize_locale]
       assert %Localize.LanguageTag{} = locale
       assert locale.cldr_locale_id == :fr
+    end
+  end
+
+  describe "init/1 - the :from option" do
+    test "accepts :all, source names, :default and function sources" do
+      assert PutSession.init(from: :all).from == :all
+
+      from = [:route, :path, :query, :body, :cookie, :session, :host, :accept_language, :default]
+      assert PutSession.init(from: from).from == from
+
+      functions = [{MyModule, :get_locale}, {MyModule, :get_locale, [:fred]}]
+      assert PutSession.init(from: functions).from == functions
+    end
+
+    test "raises on a :from that is not :all or a list of sources" do
+      for invalid <- [nil, [], :query, "query", %{}, 1] do
+        assert_raise ArgumentError, ~r/Invalid option for `:from`/, fn ->
+          PutSession.init(from: invalid)
+        end
+      end
+    end
+
+    test "raises on an entry that is not a source, and names it" do
+      for invalid <- [:nope, "query", {MyModule}, {MyModule, "get_locale"}, {MyModule, :f, :args}] do
+        assert_raise ArgumentError, ~r/Invalid option for `:from`.*Found \[/s, fn ->
+          PutSession.init(from: [:query, invalid])
+        end
+      end
+    end
+  end
+
+  describe "call/2 - the :from option" do
+    # A request with a session, resolved by `PutLocale` with its default
+    # sources, and then through `PutSession` with the options given.
+    defp visit(path, session_options, setup \\ & &1) do
+      :get
+      |> conn(path)
+      |> put_in([Access.key(:secret_key_base)], String.duplicate("X", 64))
+      |> Plug.Session.call(@session_options)
+      |> fetch_session()
+      |> fetch_query_params()
+      |> setup.()
+      |> PutLocale.call(PutLocale.init([]))
+      |> PutSession.call(PutSession.init(session_options))
+      |> send_resp(200, "")
+    end
+
+    @chosen [from: [:route, :path, :query, :body]]
+
+    test "stores a locale from a listed source" do
+      conn = visit("/?locale=fr", @chosen)
+
+      assert PutLocale.get_locale_source(conn) == :query
+      assert get_session(conn, "localize_locale") == "fr"
+      assert conn.resp_cookies != %{}
+    end
+
+    test "does not store a locale inferred from accept-language, and sets no cookie" do
+      conn = visit("/", @chosen, &put_req_header(&1, "accept-language", "fr"))
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :fr
+      assert PutLocale.get_locale_source(conn) == :accept_language
+      assert get_session(conn, "localize_locale") == nil
+      assert conn.resp_cookies == %{}
+    end
+
+    test "does not store the default locale, unless :default is listed" do
+      conn = visit("/", @chosen)
+
+      assert PutLocale.get_locale_source(conn) == :default
+      assert get_session(conn, "localize_locale") == nil
+      assert conn.resp_cookies == %{}
+
+      conn = visit("/", from: [:query, :default])
+
+      assert is_binary(get_session(conn, "localize_locale"))
+    end
+
+    test "leaves a stored locale alone, and it goes on deciding" do
+      conn =
+        visit("/", @chosen, fn conn ->
+          conn
+          |> put_session("localize_locale", "de")
+          |> put_req_header("accept-language", "fr")
+        end)
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :de
+      assert PutLocale.get_locale_source(conn) == :session
+      assert get_session(conn, "localize_locale") == "de"
+    end
+
+    test "replaces a stored locale when the visitor chooses another" do
+      conn = visit("/?locale=fr", @chosen, &put_session(&1, "localize_locale", "de"))
+
+      assert get_session(conn, "localize_locale") == "fr"
+    end
+
+    test "stores a locale from a function source that is listed, and not one that is not" do
+      function = {MyModule, :get_locale}
+
+      resolved = fn session_options ->
+        :get
+        |> conn("/")
+        |> put_in([Access.key(:secret_key_base)], String.duplicate("X", 64))
+        |> Plug.Session.call(@session_options)
+        |> fetch_session()
+        |> PutLocale.call(PutLocale.init(from: [function]))
+        |> PutSession.call(PutSession.init(session_options))
+      end
+
+      assert get_session(resolved.(from: [function]), "localize_locale") == "fr"
+      assert get_session(resolved.(from: [:query]), "localize_locale") == nil
+    end
+
+    test "with the default :all, stores a locale from any source as before" do
+      conn = visit("/", [], &put_req_header(&1, "accept-language", "fr"))
+
+      assert get_session(conn, "localize_locale") == "fr"
+      assert conn.resp_cookies != %{}
     end
   end
 end

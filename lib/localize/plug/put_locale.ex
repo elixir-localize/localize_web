@@ -1,5 +1,6 @@
 defmodule Localize.Plug.PutLocale do
   @private_key :localize_locale
+  @source_key :localize_locale_source
   @session_key "localize_locale"
 
   @default_from [:route, :path, :query, :session, :accept_language]
@@ -12,7 +13,7 @@ defmodule Localize.Plug.PutLocale do
 
   When a locale is found, `Localize.put_locale/1` is always called to set the process locale. If Gettext backends are configured, the locale is also set on each backend.
 
-  If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`.
+  If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`. The source that decided it is recorded too, and `Localize.Plug.PutLocale.get_locale_source/1` returns it.
 
   The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. The plug adds them in a `vary` line of its own, and leaves any `vary` line already on the response as it is. The header tells a shared cache which requests a stored response may be reused for. A `{Module, function}` source that reads a request header must add its own `vary` value. The `:vary` option turns the header off for an application that declares how its responses vary itself.
 
@@ -132,8 +133,9 @@ defmodule Localize.Plug.PutLocale do
 
   @doc false
   def call(conn, options) do
-    {locale, consulted} = locale_from_params(conn, options[:from], options)
-    locale = locale || default(conn, options)
+    {found, consulted} = locale_from_params(conn, options[:from], options)
+    source = source(found, consulted)
+    locale = found || default(conn, options)
     conn = put_vary(conn, consulted, options[:vary])
 
     if locale do
@@ -143,10 +145,22 @@ defmodule Localize.Plug.PutLocale do
         put_gettext_locale(gettext_backend, locale)
       end)
 
-      put_private(conn, @private_key, locale)
+      conn
+      |> put_private(@private_key, locale)
+      |> put_private(@source_key, source)
     else
       conn
     end
+  end
+
+  # The source that decided: the last one consulted when one of them had
+  # a locale, and the `:default` option when none did.
+  defp source(nil, _consulted) do
+    :default
+  end
+
+  defp source(_locale, consulted) do
+    List.last(consulted)
   end
 
   defp put_gettext_locale(gettext_backend, locale) do
@@ -201,6 +215,13 @@ defmodule Localize.Plug.PutLocale do
     @private_key
   end
 
+  @doc false
+  # The sources the `:from` option accepts by name. `Localize.Plug.PutSession`
+  # validates its own `:from` option against the same list.
+  def sources do
+    @from_options
+  end
+
   @doc """
   Returns the locale set by `Localize.Plug.PutLocale`.
 
@@ -215,6 +236,34 @@ defmodule Localize.Plug.PutLocale do
   """
   def get_locale(%Plug.Conn{private: private}), do: private[@private_key]
   def get_locale(_conn), do: nil
+
+  @doc """
+  Returns the source that decided the locale set by `Localize.Plug.PutLocale`.
+
+  This tells a locale the visitor chose, in the URL or a form, from one that was only inferred, from the `accept-language` header or the default. `Localize.Plug.PutSession` reads it to store the first kind and not the second.
+
+  ### Arguments
+
+  * `conn` is a `t:Plug.Conn.t/0`.
+
+  ### Returns
+
+  * The entry of the `:from` option the locale was found in, such as `:query`, `:session` or `:accept_language`, or
+
+  * `:default` when no source had a locale and the `:default` option supplied it, or
+
+  * `nil` when no locale was set or `conn` is not a `t:Plug.Conn.t/0`.
+
+  """
+  @spec get_locale_source(term()) ::
+          atom() | {module(), atom()} | {module(), atom(), list()} | nil
+  def get_locale_source(%Plug.Conn{private: private}) do
+    private[@source_key]
+  end
+
+  def get_locale_source(_conn) do
+    nil
+  end
 
   @doc """
   Attempts to resolve a locale from a hostname's top-level domain.

@@ -8,6 +8,12 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Plug.PutLocale` takes a `:vary` option. `vary: false` stops the plug adding a `vary` header, for an application that declares how its responses vary itself; the default is `true`.
 
+* `Localize.Plug.PutSession` takes a `:from` option naming the sources whose locale is stored, so `from: [:route, :path, :query, :body]` stores a locale the visitor chose and not one inferred from `accept-language`. A first visit then sets no cookie; the default, `:all`, stores every locale as before.
+
+* `Localize.Plug.PutLocale.get_locale_source/1` returns the source that decided the locale of a request, such as `:query` or `:accept_language`, or `:default`.
+
+* `Localize.Plug.live_session_locale/1` is given as the `:session` of a `live_session`, and hands a connected LiveView the locale the plug resolved without writing it to the session cookie.
+
 ### Changed
 
 * `Localize.Plug.PutLocale` adds its `vary` fields in a header line of its own, and no longer reads or rewrites a `vary` line already on the response. A response that already had one now carries two lines, which a recipient combines.

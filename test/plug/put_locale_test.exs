@@ -673,4 +673,75 @@ defmodule Localize.Plug.PutLocaleTest do
       assert PutLocale.get_locale(test_conn) == nil
     end
   end
+
+  describe "get_locale_source/1" do
+    defp resolve(path, from, headers \\ []) do
+      conn = conn(:get, path)
+
+      headers
+      |> Enum.reduce(conn, fn {name, value}, conn -> put_req_header(conn, name, value) end)
+      |> PutLocale.call(PutLocale.init(from: from))
+    end
+
+    test "is the source the locale was found in" do
+      from = [:query, :accept_language]
+      headers = [{"accept-language", "fr"}]
+
+      assert PutLocale.get_locale_source(resolve("/?locale=de", from, headers)) == :query
+      assert PutLocale.get_locale_source(resolve("/", from, headers)) == :accept_language
+    end
+
+    test "is the source that had a locale, not one consulted before it" do
+      conn =
+        resolve("/?locale=zz", [:query, :accept_language], [
+          {"accept-language", "fr"}
+        ])
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :fr
+      assert PutLocale.get_locale_source(conn) == :accept_language
+    end
+
+    test "is :route for a locale the route set" do
+      {:ok, route_locale} = Localize.validate_locale("fr")
+
+      conn =
+        :get
+        |> conn("/")
+        |> put_private(:localize_locale, route_locale)
+        |> PutLocale.call(PutLocale.init([]))
+
+      assert PutLocale.get_locale_source(conn) == :route
+    end
+
+    test "is the tuple for a source that is a function" do
+      assert PutLocale.get_locale_source(resolve("/", [{MyModule, :get_locale}])) ==
+               {MyModule, :get_locale}
+
+      assert PutLocale.get_locale_source(resolve("/", [{MyModule, :get_locale, [:fred]}])) ==
+               {MyModule, :get_locale, [:fred]}
+    end
+
+    test "is :default when no source has a locale" do
+      conn = resolve("/", [:query, :accept_language])
+
+      assert PutLocale.get_locale(conn) == @default_locale
+      assert PutLocale.get_locale_source(conn) == :default
+    end
+
+    test "is nil when nothing is found and there is no default" do
+      conn =
+        :get
+        |> conn("/")
+        |> PutLocale.call(PutLocale.init(from: [:query], default: :none))
+
+      assert PutLocale.get_locale(conn) == nil
+      assert PutLocale.get_locale_source(conn) == nil
+    end
+
+    test "is nil for a conn the plug has not seen, and for anything that is not a conn" do
+      for value <- [conn(:get, "/"), nil, %{}, "conn", :conn] do
+        assert PutLocale.get_locale_source(value) == nil
+      end
+    end
+  end
 end

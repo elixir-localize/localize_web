@@ -180,4 +180,47 @@ defmodule Localize.LiveViewTest do
     end
     """)
   end
+
+  describe "live_session_locale/1, when only a chosen locale is stored" do
+    @default_locale Localize.LanguageTag.to_string(Localize.default_locale())
+
+    defp french_browser do
+      Plug.Conn.put_req_header(build_conn(), "accept-language", "fr")
+    end
+
+    test "hands the connected mount a locale that is not in the session cookie" do
+      conn = get(french_browser(), "/chosen/handed")
+
+      assert text(html_response(conn, 200), "locale") == "fr"
+      assert Localize.Plug.PutLocale.get_locale_source(conn) == :accept_language
+      assert Plug.Conn.get_session(conn, "localize_locale") == nil
+      refute Map.has_key?(conn.resp_cookies, "_live")
+
+      {:ok, _view, html} = live(conn)
+      assert text(html, "locale") == "fr"
+      assert text(html, "gettext") == "fr"
+    end
+
+    test "without it the connected mount falls back to the default locale" do
+      conn = get(french_browser(), "/chosen/cookie-only")
+
+      assert text(html_response(conn, 200), "locale") == "fr"
+      assert Plug.Conn.get_session(conn, "localize_locale") == nil
+
+      {:ok, _view, html} = live(conn)
+      assert text(html, "locale") == @default_locale
+    end
+
+    test "a locale the visitor chose is stored, and reaches the connected mount either way" do
+      for path <- ["/chosen/handed", "/chosen/cookie-only"] do
+        conn = get(french_browser(), path <> "?locale=de")
+
+        assert text(html_response(conn, 200), "locale") == "de"
+        assert Plug.Conn.get_session(conn, "localize_locale") == "de"
+
+        {:ok, _view, html} = live(conn)
+        assert text(html, "locale") == "de"
+      end
+    end
+  end
 end

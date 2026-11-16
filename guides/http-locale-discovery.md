@@ -157,6 +157,10 @@ One such application keeps the locale in the session and has a cache of its own 
 
 With `vary: false` the plug adds no `vary` header at all. If `:session` or `:cookie` is still in `:from` and nothing else declares it, a cache in front of the application serves one visitor's language to another.
 
+A response that writes the session is made for one visitor, and should say so. `Localize.Plug.PutSession` writes the session when the locale it stores differs from the one already there, and a cache that stores that response answers the next visitor in the application's place: their choice of locale never reaches the application, and is lost. Send such a response with `cache-control: private`, which is Plug's default, and keep `public` for the responses that set no cookie. A locale chosen in the query or the body arrives on one request, which `Localize.Plug.PutLocale.get_locale_source/1` identifies. A locale in the path is on every request for that page, so do not make a response private for that alone: the page would never be stored.
+
+Storing only a locale the visitor chose, with the `:from` option of `Localize.Plug.PutSession`, means a visitor who never chooses sets no cookie, and two such visitors can be served from one stored response. For those visitors the `accept-language` header goes on deciding, so a cache that matches it as written stores one response for each way a browser writes it. A cache that normalises the header before the lookup stores one for each language.
+
 ### Avoiding Localize Calls at Compile Time
 
 Plug options in a Phoenix router pipeline are evaluated when the module compiles. This means any `Localize.*` function call in a plug option executes during `mix compile`, which forces the Localize application to boot inside the compiler's VM and load CLDR data into memory. On memory-constrained build environments (CI runners, Docker builders, Fly.io remote builders) this can cause the compilation to be killed with an out-of-memory error.
@@ -280,6 +284,23 @@ The `:as` option controls the storage format:
 
 The session key is fixed to `"localize_locale"` so that downstream consumers (such as LiveView `on_mount` callbacks) can retrieve the locale without configuration.
 
+### Storing only a locale the visitor chose
+
+By default the plug stores every locale it is given, including one that was only inferred from the `accept-language` header. A first visit therefore writes the session, and its response sets a cookie. That costs more than it looks: Varnish and nginx, among others, will not store a response that sets a cookie, and from the next request on the session decides the locale, so the response varies on the cookie.
+
+The `:from` option names the sources whose locale is stored. It takes the same names as the `:from` option of `Localize.Plug.PutLocale`, and `:default` for the locale the `:default` option supplies:
+
+```elixir
+plug Localize.Plug.PutLocale
+plug Localize.Plug.PutSession, from: [:route, :path, :query, :body]
+```
+
+A locale the visitor chose, in the URL or a form, is stored. One inferred from `accept-language`, the host or the default is not, and it is inferred again on the next request. A visitor who never chooses is given no cookie by these plugs.
+
+Leave `:route` and `:path` out as well if a visit to a localized URL should not replace a choice already stored. `Localize.Plug.PutLocale.get_locale_source/1` returns the source that decided, for a plug of your own.
+
+The default is `:all`, which stores a locale from any source, and a connected LiveView relies on it unless the live session is given the locale another way: see [LiveView Integration](#liveview-integration).
+
 ## LiveView Integration
 
 In LiveView, the HTTP plug pipeline runs only on the initial page load. For subsequent live navigation, the locale must be restored from the session in the `on_mount` callback:
@@ -329,6 +350,24 @@ end
 ```
 
 Every route inside `localize_live_session/3` must be inside a `localize` block; keep unlocalized live routes in their own `live_session/3`. A localized `live` route defined for more than one locale outside `localize_live_session/3` produces a compile-time warning.
+
+### When only a chosen locale is stored
+
+A connected LiveView cannot read the `accept-language` header, so the session is the only place it can take the locale from. When `Localize.Plug.PutSession` stores only a locale the visitor chose, a visitor who has not chosen has none in the session cookie: the page renders in the locale of their browser and the LiveView then mounts in the default locale.
+
+Give the live session `Localize.Plug.live_session_locale/1` as its `:session`. LiveView calls it with the `conn` of the request and signs the result into the page, so the locale the plug resolved reaches `on_mount` without being written to the cookie:
+
+```elixir
+live_session :unlocalized,
+  on_mount: [MyAppWeb.LocaleLive],
+  session: {Localize.Plug, :live_session_locale, []} do
+  scope "/", MyAppWeb do
+    live "/dashboard", DashboardLive
+  end
+end
+```
+
+`localize_live_session/3` already passes the locale of a localized route this way, so only live sessions that are not localized need it.
 
 ## Accessing the Locale in Controllers and Views
 
