@@ -6,7 +6,9 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
 
-* [ ] **A well-formed locale that matches nothing resolves to the root locale** — `?locale=tlh` is taken as a hit by `PutLocale`, with the locale `und`, because `Localize.validate_locale/1` resolves a valid tag with no CLDR data to `:und` and documents that it does. It should end up as the default locale; decide whether that is fixed in Localize or by `PutLocale` treating the result as a miss.
+## Blocked
+
+* [ ] **A well-formed locale that matches nothing resolves to the root locale** — `?locale=tlh` is taken as a hit by `PutLocale`, with the locale `und`, and the `:from` option of `PutSession` would store it as a choice. Blocked on Localize returning the default locale for such a tag, an open item in its `TODO.md`; nothing changes in `localize_web` once it does.
 
 ## Deferred
 
