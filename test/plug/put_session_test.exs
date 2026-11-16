@@ -7,6 +7,8 @@ defmodule Localize.Plug.PutSessionTest do
   alias Localize.Plug.PutLocale
   alias Localize.Plug.PutSession
 
+  doctest Localize.Plug.PutSession
+
   @session_options Plug.Session.init(store: :cookie, key: "_key", signing_salt: "X")
 
   defp session_conn(locale_string) do
@@ -323,6 +325,55 @@ defmodule Localize.Plug.PutSessionTest do
 
       assert get_session(conn, "localize_locale") == "fr"
       assert conn.resp_cookies != %{}
+    end
+  end
+
+  describe "stored?/1" do
+    test "is true when the plug writes the locale, and false on the next request" do
+      first = visit("/?locale=fr", [])
+
+      assert PutSession.stored?(first)
+      assert first.resp_cookies != %{}
+
+      second =
+        :get
+        |> conn("/?locale=fr")
+        |> recycle_cookies(first)
+        |> put_in([Access.key(:secret_key_base)], String.duplicate("X", 64))
+        |> Plug.Session.call(@session_options)
+        |> fetch_session()
+        |> fetch_query_params()
+        |> PutLocale.call(PutLocale.init([]))
+        |> PutSession.call(PutSession.init([]))
+        |> send_resp(200, "")
+
+      refute PutSession.stored?(second)
+      assert second.resp_cookies == %{}
+    end
+
+    test "is true when a stored locale is replaced" do
+      conn = visit("/?locale=fr", [], &put_session(&1, "localize_locale", "de"))
+
+      assert PutSession.stored?(conn)
+    end
+
+    test "is false when :from leaves the deciding source out" do
+      conn = visit("/", @chosen, &put_req_header(&1, "accept-language", "fr"))
+
+      refute PutSession.stored?(conn)
+    end
+
+    test "is false when the session already holds the locale" do
+      conn = visit("/", [], &put_session(&1, "localize_locale", "de"))
+
+      assert PutLocale.get_locale_source(conn) == :session
+      refute PutSession.stored?(conn)
+    end
+
+    test "is false before the plug runs, and for anything that is not a conn" do
+      for value <- [conn(:get, "/"), nil, %{}, "conn", :conn] do
+        refute PutSession.stored?(value)
+      end
     end
   end
 end

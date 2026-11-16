@@ -157,7 +157,19 @@ One such application keeps the locale in the session and has a cache of its own 
 
 With `vary: false` the plug adds no `vary` header at all. If `:session` or `:cookie` is still in `:from` and nothing else declares it, a cache in front of the application serves one visitor's language to another.
 
-A response that writes the session is made for one visitor, and should say so. `Localize.Plug.PutSession` writes the session when the locale it stores differs from the one already there, and a cache that stores that response answers the next visitor in the application's place: their choice of locale never reaches the application, and is lost. Send such a response with `cache-control: private`, which is Plug's default, and keep `public` for the responses that set no cookie. A locale chosen in the query or the body arrives on one request, which `Localize.Plug.PutLocale.get_locale_source/1` identifies. A locale in the path is on every request for that page, so do not make a response private for that alone: the page would never be stored.
+A response that writes the session is made for one visitor, and should say so. `Localize.Plug.PutSession` writes the session when the locale it stores differs from the one already there, and a cache that stores that response answers the next visitor in the application's place: their choice of locale never reaches the application, and is lost. Send such a response with `cache-control: private`, which is Plug's default, and keep `public` for the responses that set no cookie. `Localize.Plug.PutSession.stored?/1` says whether the plug wrote the session for a request:
+
+```elixir
+def put_cache_control(conn, _options) do
+  if Localize.Plug.PutSession.stored?(conn) do
+    put_resp_header(conn, "cache-control", "private")
+  else
+    put_resp_header(conn, "cache-control", "public, max-age=60")
+  end
+end
+```
+
+Do not decide it from where the locale came from. A locale in the path is on every request for that page, so a page made private for that reason would never be stored.
 
 Storing only a locale the visitor chose, with the `:from` option of `Localize.Plug.PutSession`, means a visitor who never chooses sets no cookie, and two such visitors can be served from one stored response. For those visitors the `accept-language` header goes on deciding, so a cache that matches it as written stores one response for each way a browser writes it. A cache that normalises the header before the lookup stores one for each language.
 

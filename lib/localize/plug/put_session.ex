@@ -18,6 +18,8 @@ defmodule Localize.Plug.PutSession do
 
   * `:from` is a list of the sources whose locale is stored: any of the names the `:from` option of `Localize.Plug.PutLocale` accepts, the `{Module, function}` and `{Module, function, args}` sources given to it, and `:default` for the locale its `:default` option supplies. A locale that `Localize.Plug.PutLocale` found in a source that is not listed is not stored, and a locale already in the session is left as it is. The default is `:all`, which stores a locale from any source.
 
+  The plug writes the session only when the locale it stores differs from the one already there. `stored?/1` says whether it did for a request, which an application that sends `cache-control: public` needs in order to send `private` on a response that sets the session cookie.
+
   > #### LiveView and a locale that is not stored {: .warning}
   >
   > A connected LiveView cannot read the `accept-language` header, so it takes the locale from the session. With a `:from` that leaves `:accept_language` out, a visitor who has not chosen a locale has none in the session cookie, and the LiveView mounts in the default locale. Pass `Localize.Plug.live_session_locale/1` as the `:session` of the live session, which hands the LiveView the locale the plug resolved without writing the cookie. `Localize.Routes.localize_live_session/3` does this already for localized routes.
@@ -41,6 +43,9 @@ defmodule Localize.Plug.PutSession do
 
   @formats [:string, :language_tag]
 
+  # Set in `conn.private` when the plug writes the locale to the session.
+  @stored_key :localize_locale_stored
+
   @doc false
   def init(options \\ []) when is_list(options) do
     {as, options} = Keyword.pop(options, :as, :string)
@@ -63,6 +68,45 @@ defmodule Localize.Plug.PutSession do
     else
       conn
     end
+  end
+
+  @doc """
+  Returns whether `Localize.Plug.PutSession` wrote the locale to the session for this request.
+
+  The plug writes the session only when the locale it stores differs from the one already there, and a response that writes the session sets the session cookie. Such a response is made for one visitor and should not be stored by a shared cache. An application that sends `cache-control: public` on its pages can use this function to send `private` on those responses instead.
+
+  ### Arguments
+
+  * `conn` is a `t:Plug.Conn.t/0`.
+
+  ### Returns
+
+  * `true` when the plug wrote the locale to the session for this request, or
+
+  * `false` when it did not, when the plug has not run, or when `conn` is not a `t:Plug.Conn.t/0`.
+
+  ### Examples
+
+      iex> Localize.Plug.PutSession.stored?(%Plug.Conn{})
+      false
+
+      # In a plug that runs after `Localize.Plug.PutSession`.
+      def put_cache_control(conn, _options) do
+        if Localize.Plug.PutSession.stored?(conn) do
+          Plug.Conn.put_resp_header(conn, "cache-control", "private")
+        else
+          Plug.Conn.put_resp_header(conn, "cache-control", "public, max-age=60")
+        end
+      end
+
+  """
+  @spec stored?(term()) :: boolean()
+  def stored?(%Plug.Conn{private: private}) do
+    Map.get(private, @stored_key, false)
+  end
+
+  def stored?(_conn) do
+    false
   end
 
   defp store?(%Localize.LanguageTag{}, _source, :all) do
@@ -93,7 +137,9 @@ defmodule Localize.Plug.PutSession do
     if get_session(conn, PutLocale.session_key()) == locale do
       conn
     else
-      put_session(conn, PutLocale.session_key(), locale)
+      conn
+      |> put_session(PutLocale.session_key(), locale)
+      |> put_private(@stored_key, true)
     end
   end
 

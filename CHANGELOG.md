@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Plug.live_session_locale/1` is given as the `:session` of a `live_session`, and hands a connected LiveView the locale the plug resolved without writing it to the session cookie.
 
+* `Localize.Plug.PutSession.stored?/1` says whether the plug wrote the locale to the session for a request, so an application can send `cache-control: private` on the response that sets the session cookie.
+
 ### Changed
 
 * `Localize.Plug.PutLocale` adds its `vary` fields in a header line of its own, and no longer reads or rewrites a `vary` line already on the response. A response that already had one now carries two lines, which a recipient combines.

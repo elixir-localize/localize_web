@@ -30,6 +30,6 @@ Connecting [`localize`](https://hex.pm/packages/localize) to Phoenix: resolving 
 
 * Do not parse `accept-language` with `String.split(",")`. It carries quality values, ranges and ordering rules.
 
-* Do not persist a locale in the session without also offering a way to change it, and do not let a stale session locale override a fresh explicit choice. `Localize.Plug.PutSession` with `from: [:route, :path, :query, :body]` stores a locale the visitor chose and not one inferred from the browser; give a `live_session` that is not localized `session: {Localize.Plug, :live_session_locale, []}` so a connected LiveView still gets the locale.
+* Do not persist a locale in the session without also offering a way to change it, and do not let a stale session locale override a fresh explicit choice. `Localize.Plug.PutSession` with `from: [:route, :path, :query, :body]` stores a locale the visitor chose and not one inferred from the browser; give a `live_session` that is not localized `session: {Localize.Plug, :live_session_locale, []}` so a connected LiveView still gets the locale. Send `cache-control: private` on a response for which `Localize.Plug.PutSession.stored?/1` is true.
 
 * Do not fall back to a hard-coded `:en` without trying the locale's parent chain first — Localize resolves `:"de-AT"` to `:de` before it gives up.
