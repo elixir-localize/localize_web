@@ -14,17 +14,19 @@ defmodule Localize.Plug.PutLocale do
 
   If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`.
 
-  The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. The plug adds them in a `vary` line of its own, and leaves any `vary` line already on the response as it is. This lets a shared cache store one response per language. A `{Module, function}` source that reads a request header must add its own `vary` value. The `:vary` option turns the header off for an application that declares how its responses vary itself.
+  The response gets a `vary` header for each request header the plug read to find the locale: `accept-language` for `:accept_language`, and `cookie` for `:session` and `:cookie`. A source read before the one that decided counts too, because a value there would have changed the locale. The plug adds them in a `vary` line of its own, and leaves any `vary` line already on the response as it is. The header tells a shared cache which requests a stored response may be reused for. A `{Module, function}` source that reads a request header must add its own `vary` value. The `:vary` option turns the header off for an application that declares how its responses vary itself.
 
   > #### The session and shared caches {: .warning}
   >
-  > The default `:from` list reads the session, so the response to a request with no locale in its URL carries `vary: cookie`. A shared cache that honours `vary` then keeps one copy for each visitor, since each visitor sends a different `cookie` header, and almost never reuses one. This matters only to an application that makes its pages cacheable by a shared cache: Plug's default `cache-control` is private. Such an application does one of the following:
+  > The default `:from` list reads the session, so the response to a request with no locale in its URL carries `vary: cookie`. A shared cache that honours `vary` can then reuse that response only for the visitor it was made for, and so works like a private cache. Some caches store no response at all that has a `vary` other than `accept-encoding`, and that applies to `vary: accept-language` too. This matters only to an application that makes its pages cacheable by a shared cache: Plug's default `cache-control` is private. Such an application does one of the following:
   >
   > * Puts the locale in the URL. It is found before the session is read, and the response carries no `vary`.
   >
-  > * Leaves `:session` out of `:from`. A locale stored in the session is then no longer read.
+  > * Leaves `:session` out of `:from`. A locale stored in the session is then no longer read, and the response carries `vary: accept-language` when that header is read.
   >
-  > * Sets `vary: false`, and declares how its responses vary itself.
+  > * For a cache inside the application alone, copies the session's locale into a request header before the cache, sends a `vary` that names that header, and sets `vary: false`.
+  >
+  > With `:session` still in `:from`, `vary: false` on its own lets a cache in front of the application serve one visitor's language to another.
   >
   > See [the `vary` response header](guides/http-locale-discovery.md#the-vary-response-header) in the HTTP locale discovery guide.
 
@@ -57,7 +59,7 @@ defmodule Localize.Plug.PutLocale do
 
     > #### `:session` and `:cookie` send `vary: cookie` {: .warning}
     >
-    > When the plug reads `:session` or `:cookie` the response carries `vary: cookie`, and a shared cache that honours it keeps one copy for each visitor. The default list reads the session for every request with no locale in its URL. An application with a shared cache in front of its pages leaves `:session` out of this list, or sets `vary: false`.
+    > When the plug reads `:session` or `:cookie` the response carries `vary: cookie`, and a shared cache that honours it can reuse the response only for the visitor it was made for. The default list reads the session for every request with no locale in its URL. An application with a shared cache in front of its pages leaves `:session` and `:cookie` out of this list. Setting `vary: false` with either still in the list is no substitute: the cache then serves one visitor's language to another.
 
   * `:default` is the default locale to set if no locale is found by other configured methods. It can be a string like `"en"` or a `Localize.LanguageTag` struct. It may also be `:none` to indicate that no locale is to be set by default. Lastly, it may also be a `{Module, function, args}` or `{Module, function}` tuple. The default is `Localize.default_locale/0` (resolved at runtime, not compile time).
 

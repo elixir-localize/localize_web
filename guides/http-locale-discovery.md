@@ -139,11 +139,13 @@ The plug adds a `vary` response header naming each request header it read to fin
 
 The header tells a shared cache which requests a stored response may be reused for. Plug's default `cache-control` is `max-age=0, private, must-revalidate`, which keeps a response out of shared caches, and there the header changes nothing.
 
-A cache that honours `vary: cookie` stores one response per visitor. To cache localized pages in a shared cache, leave `:session` and `:cookie` out of `:from` on those routes, so the plug declares `accept-language` alone:
+A shared cache that honours `vary: cookie` can reuse a response only for the visitor it was made for, so it works like a private cache. To cache localized pages in a shared cache, leave `:session` and `:cookie` out of `:from` on those routes, so the plug declares `accept-language` alone:
 
 ```elixir
 plug Localize.Plug.PutLocale, from: [:route, :path, :query, :accept_language]
 ```
+
+Not every cache honours `vary`. Some store no response that has a `vary` other than `accept-encoding`, as [Akamai's edge servers](https://techdocs.akamai.com/property-mgr/docs/rm-vary-header) do by default, so `vary: accept-language` keeps a page out of such a cache as well. Others ignore `vary` until they are configured to honour it, as [Cloudflare](https://blog.cloudflare.com/vary-support/) does. A locale in the URL adds no `vary` and gives each language its own cache key, so it is the form every cache handles.
 
 An application that declares how its responses vary itself turns the plug's header off with `vary: false`. The default is `true`.
 
@@ -153,7 +155,7 @@ plug Localize.Plug.PutLocale, vary: false
 
 One such application keeps the locale in the session and has a cache of its own in the plug pipeline. A plug that runs before the cache copies the session's locale into a request header, the cache keys on that header, and the application sends a `vary` that names it. The plug's `vary: cookie` would then only split the cache by visitor, so it is turned off. This works for a cache inside the application alone: a cache in front of the application sees the request before that header is written.
 
-With `vary: false` the plug adds no `vary` header at all, and a shared cache that is told nothing serves one visitor's language to another.
+With `vary: false` the plug adds no `vary` header at all. If `:session` or `:cookie` is still in `:from` and nothing else declares it, a cache in front of the application serves one visitor's language to another.
 
 ### Avoiding Localize Calls at Compile Time
 
