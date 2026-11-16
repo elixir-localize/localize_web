@@ -151,6 +151,8 @@ An application that declares how its responses vary itself turns the plug's head
 plug Localize.Plug.PutLocale, vary: false
 ```
 
+One such application keeps the locale in the session and has a cache of its own in the plug pipeline. A plug that runs before the cache copies the session's locale into a request header, the cache keys on that header, and the application sends a `vary` that names it. The plug's `vary: cookie` would then only split the cache by visitor, so it is turned off. This works for a cache inside the application alone: a cache in front of the application sees the request before that header is written.
+
 With `vary: false` the plug adds no `vary` header at all, and a shared cache that is told nothing serves one visitor's language to another.
 
 ### Avoiding Localize Calls at Compile Time
