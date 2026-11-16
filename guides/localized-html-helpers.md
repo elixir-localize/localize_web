@@ -179,7 +179,7 @@ iex> Localize.HTML.Locale.select(:my_form, :locale, selected: "en")
 
 ### Options
 
-* `:locales` — a list of locale identifiers to include. The default is the locales configured for Localize, `Localize.supported_locales/0`.
+* `:locales` — a list of locale identifiers to include. The default is the locales configured for Localize, `Localize.supported_locales/0`, without the root locale `und` and the world English `en-001`.
 
 * `:locale` — the locale used to localize display names. The default is `Localize.get_locale/0`. The special value `:identity` renders each locale's name in its own language.
 
@@ -203,7 +203,7 @@ iex> Localize.HTML.Locale.select(:my_form, :locale,
 ...> )
 ```
 
-This renders "English", "Français", "Deutsch", and "日本語" each in their respective language. Each `<option>` also receives a `lang` attribute set to its locale for proper browser rendering of non-Latin scripts.
+This renders "Deutsch", "English", "français" and "日本語", each in its own language and as that language writes its own name. Each `<option>` also receives a `lang` attribute set to its locale for proper browser rendering of non-Latin scripts.
 
 ### Restricting the Locale List
 
@@ -250,7 +250,7 @@ iex> Localize.HTML.Unit.select(:my_form, :unit, selected: :kilogram)
 ### Different Display Styles
 
 ```elixir
-# Long: "Kilograms"
+# Long: "kilograms"
 iex> Localize.HTML.Unit.select(:my_form, :unit, style: :long, selected: :kilogram)
 
 # Short: "kg"

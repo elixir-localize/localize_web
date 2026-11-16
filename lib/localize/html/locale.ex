@@ -52,7 +52,7 @@ defmodule Localize.HTML.Locale do
 
   ### Options
 
-  * `:locales` defines the list of locales to be displayed in the select tag. The default is the locales configured for Localize, `Localize.supported_locales/0`.
+  * `:locales` defines the list of locales to be displayed in the select tag. The default is the locales configured for Localize, `Localize.supported_locales/0`, without the root locale `und` and the world English `en-001`.
 
   * `:locale` defines the locale used to localise the display names. The default is the locale returned by `Localize.get_locale/0`. If set to `:identity` then each locale in `:locales` will be rendered in its own locale.
 

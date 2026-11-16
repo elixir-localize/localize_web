@@ -61,9 +61,16 @@ defmodule Localize.HTML.InvalidOptionsTest do
     codes =
       Localize.HTML.Locale.locale_options(locale: :en) |> Enum.map(&elem(&1, 1)) |> Enum.sort()
 
-    configured = Localize.supported_locales() |> Enum.map(&to_string/1) |> Enum.sort()
+    # Localize 1.5 and later always list the root locale `:und` as
+    # supported. It is not a language a visitor can choose, so the select
+    # leaves it out.
+    configured =
+      (Localize.supported_locales() -- [:und])
+      |> Enum.map(&to_string/1)
+      |> Enum.sort()
 
     assert codes == configured
+    refute "und" in codes
   end
 
   test "Locale renders each locale in itself with locale: :identity" do

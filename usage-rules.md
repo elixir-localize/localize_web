@@ -26,7 +26,7 @@ Connecting [`localize`](https://hex.pm/packages/localize) to Phoenix: resolving 
 
 * **Do not choose the content language from the visitor's IP geolocation.** Location is not language, and it fails for travellers, expatriates, multilingual territories and VPN users. `accept-language` is the user's explicit statement of preference; honour it. Geolocation is at best a tiebreaker when the header offers nothing supported.
 
-* When you do vary on the header, send `Vary: Accept-Language` so caches and CDNs do not serve one visitor's language to another.
+* When you do vary on the header, send `Vary: Accept-Language` so caches and CDNs do not serve one visitor's language to another. `Localize.Plug.PutLocale` sends `vary` for the request headers it reads, unless `vary: false` is set; `Localize.Plug.AcceptLanguage` sends none.
 
 * Do not parse `accept-language` with `String.split(",")`. It carries quality values, ranges and ordering rules.
 
