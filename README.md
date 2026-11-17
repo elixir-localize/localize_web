@@ -22,6 +22,10 @@ Phoenix integration for the [Localize](https://hex.pm/packages/localize) library
 
 * **[HTML Form Helpers](https://hexdocs.pm/localize_web/localized-html-helpers.html)** — generate `<select>` tags and option lists for currencies, territories, territory subdivisions, locales, units of measure, and months with localized display names.
 
+## Supported Elixir and OTP versions
+
+Localize Web requires **Elixir 1.17+** and **Erlang/OTP 26+**.
+
 ## Installation
 
 Add `localize_web` to your list of dependencies in `mix.exs`:
@@ -34,9 +38,9 @@ def deps do
 end
 ```
 
-## Quick Start
+## Quick start
 
-### Locale Discovery
+### Locale discovery
 
 Add the locale plugs to your Phoenix browser pipeline after `fetch_session`:
 
@@ -51,12 +55,9 @@ pipeline :browser do
 end
 ```
 
-`Localize.Plug.PutLocale` reads the `:session` source with
-`Plug.Conn.get_session/2`, so `fetch_session` must run first. If `:cookie` is
-used outside a browser/session pipeline, fetch cookies before `PutLocale`;
-`fetch_session` already does that in the browser pipeline.
+`Localize.Plug.PutLocale` reads the `:session` source with `Plug.Conn.get_session/2`, so `fetch_session` must run first. If `:cookie` is used outside a browser/session pipeline, fetch cookies before `PutLocale`; `fetch_session` already does that in the browser pipeline.
 
-### LiveView Support
+### LiveView support
 
 Restore the locale in your LiveView `on_mount` callback:
 
@@ -79,7 +80,7 @@ localize_live_session :default, on_mount: [MyAppWeb.LocaleLive] do
 end
 ```
 
-### Localized Routes
+### Localized routes
 
 Configure your router with localized routes:
 
@@ -97,7 +98,7 @@ end
 
 Provide translations in `priv/gettext/{locale}/LC_MESSAGES/routes.po` for each path segment.
 
-### Verified Localized Routes
+### Verified localized routes
 
 Use the `~q` sigil for compile-time verified localized paths:
 
@@ -111,7 +112,7 @@ use Localize.VerifiedRoutes,
 ~q"/users"
 ```
 
-### HTML Helpers
+### HTML helpers
 
 Generate localized select tags in your templates:
 
@@ -130,3 +131,7 @@ Full documentation is available on [HexDocs](https://hexdocs.pm/localize_web).
 > #### Attribution {: .info}
 >
 > The localized routing in this library is based on `ex_cldr_routes` which was inspired by the work originally done by [Bart Otten](https://github.com/BartOtten) on `PhxAltRoutes` — which has evolved to the much enhanced [Routex](https://hex.pm/packages/routex). Users seeking a more comprehensive and extensible localized routing solution should consider [Routex](https://hex.pm/packages/routex) as an alternative to `Localize.Routes`.
+
+## License
+
+Localize Web is released under the Apache License 2.0; see [LICENSE.md](https://github.com/elixir-localize/localize_web/blob/v1.4.0/LICENSE.md).
