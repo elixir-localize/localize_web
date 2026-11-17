@@ -11,6 +11,8 @@ defmodule Localize.Plug.PutLocale do
 
   The locale can be derived from the accept-language header, a query parameter, a URL parameter, a body parameter, a cookie, the route, the session, or the hostname TLD. Sources are checked in the order specified by the `:from` option, and the first successful match wins.
 
+  A source counts only when what it holds matches a locale the application supports. An identifier that is valid but matches none, such as `pt` where Portuguese is not supported, is passed over and the next source is checked.
+
   When a locale is found, `Localize.put_locale/1` is always called to set the process locale. If Gettext backends are configured, the locale is also set on each backend.
 
   If a locale is found then `conn.private[:localize_locale]` is also set. It can be retrieved with `Localize.Plug.PutLocale.get_locale/1`. The source that decided it is recorded too, and `Localize.Plug.PutLocale.get_locale_source/1` returns it.
@@ -102,6 +104,9 @@ defmodule Localize.Plug.PutLocale do
   ]
 
   @language_header "accept-language"
+
+  # The language subtags that name the root locale.
+  @root_languages ["und", "root"]
 
   # A country-code TLD is always exactly two ASCII letters. Every generic TLD
   # is longer, so a length test excludes all of them at once and keeps doing
@@ -479,8 +484,71 @@ defmodule Localize.Plug.PutLocale do
        when not is_nil(id),
        do: {:ok, locale}
 
+  # An identifier from the request is a hit only when it matches a locale
+  # the application supports, by the test `Localize.AcceptLanguage` applies
+  # to a tag in the header. `Localize.validate_locale/1` alone always
+  # answers for a valid tag: with the root locale `und` for one CLDR has no
+  # data for, such as `tlh`, and with the first supported locale for one
+  # that is too distant from all of them, such as `pt` where only `en` and
+  # `fr` are supported. Both are right for formatting and neither is what
+  # the visitor asked for, so they are misses and the next source is tried.
+  # The root locale is kept when it is what was asked for.
   defp validate_locale_param(locale) do
-    Localize.validate_locale(locale)
+    if root_requested?(locale) do
+      Localize.validate_locale(locale)
+    else
+      supported_locale(locale)
+    end
+  end
+
+  defp supported_locale(locale) do
+    with {:ok, tag} <- Localize.validate_locale(locale) do
+      supported_match(tag, locale)
+    end
+  end
+
+  # An identifier that is the id of the locale it resolved to names a
+  # supported locale outright, and needs no scoring. That is what the
+  # session holds, which is read on every request with no locale in its
+  # URL. Any other identifier is scored against the locale it resolved to,
+  # which takes about 15 microseconds.
+  defp supported_match(%Localize.LanguageTag{cldr_locale_id: locale_id} = tag, locale)
+       when is_binary(locale) do
+    if Atom.to_string(locale_id) == locale do
+      {:ok, tag}
+    else
+      Localize.AcceptLanguage.supported_match(tag)
+    end
+  end
+
+  defp supported_match(tag, _locale) do
+    Localize.AcceptLanguage.supported_match(tag)
+  end
+
+  # Whether an identifier names the root locale: its language subtag is
+  # `und`, or CLDR's `root`, whatever extensions follow.
+  defp root_requested?(requested) when is_binary(requested) do
+    language =
+      requested
+      |> String.split(["-", "_"], parts: 2)
+      |> List.first()
+      |> String.downcase()
+
+    language in @root_languages
+  end
+
+  defp root_requested?(requested) when is_atom(requested) do
+    root_requested?(Atom.to_string(requested))
+  end
+
+  # A tag that was parsed and not yet validated carries its language as
+  # it was written.
+  defp root_requested?(%Localize.LanguageTag{language: language}) do
+    root_requested?(language)
+  end
+
+  defp root_requested?(_requested) do
+    false
   end
 
   defp validate_from(options, nil), do: Keyword.put(options, :from, @default_from)

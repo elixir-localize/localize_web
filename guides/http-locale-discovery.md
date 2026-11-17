@@ -98,6 +98,8 @@ A locale in the URL is an explicit choice, so it wins over the session and the b
 
 The first source that yields a valid locale wins. Remaining sources are not consulted.
 
+A source yields a locale only when what it holds matches a locale the application supports. An identifier that is valid and matches none is passed over, and the next source is consulted: `?locale=pt` where Portuguese is not supported, or `?locale=tlh`, a language CLDR has no data for. `Localize.validate_locale/1` would answer for both, with the first supported locale and with the root locale `und`, which are right for formatting and are not what the visitor asked for. The root locale is taken when it is asked for by name, as `und`.
+
 ### The :param Option
 
 The `:param` option specifies the parameter name to look for in query, path, body, and cookie sources. The default is `"locale"`. For example, with `param: "lang"`, the plug will look for `?lang=fr` in query params or a `lang` path parameter.

@@ -131,10 +131,15 @@ defmodule Localize.AcceptLanguage do
     )
   end
 
-  # A header tag's supported locale, when it matches one within
+  # A tag's supported locale, when it matches one within
   # `@max_match_distance`. When CLDR matches across languages, the supported
   # locale is returned, so its language is the one being served.
-  defp supported_match(tag) do
+  #
+  # `Localize.Plug.PutLocale` applies the same test to an identifier in the
+  # URL, a form, a cookie or the session, so that the header and the other
+  # sources agree on what counts as a locale the application supports.
+  @doc false
+  def supported_match(tag) do
     with {:ok, requested} <- Localize.validate_locale(tag),
          {:ok, locale_id, _distance} <-
            Localize.LanguageTag.best_match(

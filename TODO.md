@@ -6,15 +6,13 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
 
-## Blocked
-
-* [ ] **A well-formed locale that matches nothing resolves to the root locale** — `?locale=tlh` is taken as a hit by `PutLocale`, with the locale `und`, and the `:from` option of `PutSession` would store it as a choice. Blocked on Localize returning the default locale for such a tag, an open item in its `TODO.md`; nothing changes in `localize_web` once it does.
-
 ## Deferred
 
 * [ ] **Store only a chosen locale by default** — `Localize.Plug.PutSession` stores a locale from any source unless given `:from`, so an application gets the first-visit cookie until it opts out. Parked for 2.0: the new default breaks a LiveView in a live session that has not been given `Localize.Plug.live_session_locale/1`.
 
 ## Done
+
+* [x] **A locale the application does not support is passed over** — `PutLocale` takes an identifier from the URL, a form, a cookie or the session only when it matches a supported locale, as `accept-language` did, so `?locale=tlh` no longer resolves to `und` nor `?locale=pt` to the first supported locale. Localize is right to answer for both when formatting; the fault was taking its answer as a match. 2026-11-17, v1.4.0.
 
 * [x] **Store only a locale the visitor chose** — `Localize.Plug.PutSession` takes `:from`, `Localize.Plug.PutLocale.get_locale_source/1` says which source decided, and `Localize.Plug.live_session_locale/1` hands a connected LiveView the locale without the cookie. 2026-11-17, v1.4.0.
 

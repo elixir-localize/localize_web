@@ -744,4 +744,133 @@ defmodule Localize.Plug.PutLocaleTest do
       end
     end
   end
+
+  describe "call/2 - a valid locale the application does not support" do
+    # `tlh` is a valid tag CLDR has no data for, which Localize resolves to
+    # the root locale `und`. `pt`, `ru` and `es-MX` are locales too distant
+    # from every supported one, which Localize resolves to the first
+    # supported locale. Each source is followed by accept-language.
+    @sources %{
+      query: &__MODULE__.in_query/1,
+      path: &__MODULE__.in_path/1,
+      body: &__MODULE__.in_body/1,
+      cookie: &__MODULE__.in_cookie/1,
+      session: &__MODULE__.in_session/1,
+      route: &__MODULE__.in_route/1
+    }
+
+    def in_query(value), do: conn(:get, "/?locale=" <> value)
+    def in_path(value), do: %{conn(:get, "/") | path_params: %{"locale" => value}}
+    def in_body(value), do: %{conn(:get, "/") | body_params: %{"locale" => value}}
+    def in_session(value), do: init_test_session(conn(:get, "/"), %{"localize_locale" => value})
+    def in_route(value), do: put_private(conn(:get, "/"), :localize_locale, value)
+
+    def in_cookie(value) do
+      :get
+      |> conn("/")
+      |> put_req_cookie("locale", value)
+      |> fetch_cookies()
+    end
+
+    defp resolved(conn, from) do
+      conn
+      |> put_req_header("accept-language", "fr")
+      |> PutLocale.call(PutLocale.init(from: from))
+    end
+
+    test "is a miss in every source that takes an identifier, so the next source decides" do
+      for {source, build} <- @sources,
+          value <- ["tlh", "TLH", "tlh-u-nu-latn", "pt", "ru", "es-MX"] do
+        conn = resolved(build.(value), [source, :accept_language])
+
+        assert {source, value, PutLocale.get_locale(conn).cldr_locale_id} == {source, value, :fr}
+        assert PutLocale.get_locale_source(conn) == :accept_language
+      end
+    end
+
+    test "falls to the default locale when no later source has one" do
+      conn = PutLocale.call(conn(:get, "/?locale=tlh"), PutLocale.init(from: [:query]))
+
+      assert PutLocale.get_locale(conn) == @default_locale
+      assert PutLocale.get_locale_source(conn) == :default
+    end
+
+    test "leaves the locale unset when there is no default either" do
+      conn =
+        PutLocale.call(conn(:get, "/?locale=tlh"), PutLocale.init(from: [:query], default: :none))
+
+      assert PutLocale.get_locale(conn) == nil
+      assert PutLocale.get_locale_source(conn) == nil
+    end
+
+    test "keeps the root locale when it is what was asked for" do
+      for value <- ["und", "UND", "root", "und-u-nu-latn", "und_u_nu_latn"] do
+        conn = resolved(conn(:get, "/?locale=" <> value), [:query, :accept_language])
+
+        assert {value, PutLocale.get_locale(conn).cldr_locale_id} == {value, :und}
+        assert PutLocale.get_locale_source(conn) == :query
+      end
+
+      conn =
+        resolved(put_private(conn(:get, "/"), :localize_locale, :und), [:route, :accept_language])
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :und
+    end
+
+    test "treats a tag that was parsed and not validated the same way" do
+      {:ok, unmatched} = Localize.LanguageTag.parse("tlh")
+
+      conn =
+        resolved(put_private(conn(:get, "/"), :localize_locale, unmatched), [
+          :route,
+          :accept_language
+        ])
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :fr
+      assert PutLocale.get_locale_source(conn) == :accept_language
+
+      {:ok, root} = Localize.LanguageTag.parse("und")
+
+      conn =
+        resolved(put_private(conn(:get, "/"), :localize_locale, root), [:route, :accept_language])
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :und
+      assert PutLocale.get_locale_source(conn) == :route
+    end
+
+    test "is not stored as a choice by PutSession" do
+      conn =
+        :get
+        |> conn("/?locale=tlh")
+        |> init_test_session(%{})
+        |> put_req_header("accept-language", "fr")
+        |> PutLocale.call(PutLocale.init([]))
+        |> Localize.Plug.PutSession.call(Localize.Plug.PutSession.init(from: [:query]))
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :fr
+      assert get_session(conn, "localize_locale") == nil
+      refute Localize.Plug.PutSession.stored?(conn)
+    end
+
+    test "still takes a locale that matches a supported one" do
+      for {value, expected} <- [
+            {"fr-CA", :fr},
+            {"zh-TW", :"zh-Hant"},
+            {"en-AU", :en},
+            {"de", :de}
+          ] do
+        conn = resolved(conn(:get, "/?locale=" <> value), [:query, :accept_language])
+
+        assert {value, PutLocale.get_locale(conn).cldr_locale_id} == {value, expected}
+        assert PutLocale.get_locale_source(conn) == :query
+      end
+    end
+
+    test "falls to the default locale for a distant locale with no later source" do
+      conn = PutLocale.call(conn(:get, "/?locale=pt"), PutLocale.init(from: [:query]))
+
+      assert PutLocale.get_locale(conn) == @default_locale
+      assert PutLocale.get_locale_source(conn) == :default
+    end
+  end
 end

@@ -20,6 +20,10 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Plug.PutLocale` adds its `vary` fields in a header line of its own, and no longer reads or rewrites a `vary` line already on the response. A response that already had one now carries two lines, which a recipient combines.
 
+### Fixed
+
+* `Localize.Plug.PutLocale` takes a locale from the URL, a form, a cookie or the session only when it matches a supported locale, as it already did for `accept-language`. `?locale=pt` where Portuguese is not supported, or `?locale=tlh`, is passed over and the next source decides, where it resolved to the first supported locale or to the root locale `und`.
+
 ## [1.3.1] — 2026-10-30
 
 ### Fixed
