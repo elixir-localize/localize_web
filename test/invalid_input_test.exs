@@ -82,6 +82,13 @@ defmodule Localize.InvalidInputTest do
       end
     end
 
+    test "returns an error for a :session_key that is not a non-empty string" do
+      for session_key <- ["", nil, :localize_locale, 42, ["localize_locale"]] do
+        assert {:error, %Localize.InvalidValueError{}} =
+                 Localize.Plug.put_locale_from_session(@session, session_key: session_key)
+      end
+    end
+
     test "returns an error for a :gettext that is not a Gettext backend" do
       for gettext <- [:not_a_module, Enum, 42, "MyApp.Gettext", [MyApp.Gettext, Enum]] do
         assert {:error, %Localize.InvalidValueError{}} =

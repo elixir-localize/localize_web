@@ -331,7 +331,7 @@ The `:as` option controls the storage format:
 
 * `:language_tag` — stores the full `%Localize.LanguageTag{}` struct. This minimizes CPU time at the expense of larger session storage.
 
-The session key is fixed to `"localize_locale"` so that downstream consumers (such as LiveView `on_mount` callbacks) can retrieve the locale without configuration.
+The locale is stored under the session key `"localize_locale"` unless `Localize.Plug.PutLocale` is given another; see [Two locales in one session](#two-locales-in-one-session).
 
 ### Storing only a locale the visitor chose
 
@@ -349,6 +349,20 @@ A locale the visitor chose, in the URL or a form, is stored. One inferred from `
 Leave `:route` and `:path` out as well if a visit to a localized URL should not replace a choice already stored. `Localize.Plug.PutLocale.get_locale_source/1` returns the source that decided, for a plug of your own.
 
 The default is `:all`, which stores a locale from any source, and a connected LiveView relies on it unless the live session is given the locale another way: see [LiveView Integration](#liveview-integration).
+
+### Two locales in one session
+
+An application may keep two locales for one visitor, such as the language they read the site's pages in and the language of its admin. Each pipeline gives `Localize.Plug.PutLocale` its own `:session_key`. The `:session` source reads that key, `Localize.Plug.PutSession` writes under it and `Localize.Plug.live_session_locale/1` hands the locale to a LiveView under it, so the key is named once per pipeline:
+
+```elixir
+pipeline :admin do
+  plug :fetch_session
+  plug Localize.Plug.PutLocale, from: [:query, :session], session_key: "admin_locale"
+  plug Localize.Plug.PutSession
+end
+```
+
+An `on_mount` callback reads the same key with `Localize.Plug.put_locale_from_session(session, session_key: "admin_locale")`, and `Localize.Routes.localize_live_session/3` takes a `:session_key` for localized live routes. `Localize.Plug.PutLocale.get_session_key/1` returns the key a request used.
 
 ## LiveView Integration
 

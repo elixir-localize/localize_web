@@ -33,6 +33,8 @@ defmodule Localize.Plug do
 
   * `:gettext` is a Gettext backend module or a list of Gettext backend modules on which the locale will be set. The default is `[]` (no Gettext backends).
 
+  * `:session_key` is the session key the locale is read from, the `:session_key` given to `Localize.Plug.PutLocale`. The default is `"#{@session_key}"`.
+
   ### Returns
 
   * `{:ok, locale}` or
@@ -59,8 +61,10 @@ defmodule Localize.Plug do
 
   def put_locale_from_session(session, options \\ [])
 
-  def put_locale_from_session(%{@session_key => locale}, options) do
+  def put_locale_from_session(session, options) when is_map(session) do
     with {:ok, gettext_backends} <- gettext_backends(options),
+         {:ok, session_key} <- session_key(options),
+         {:ok, locale} <- session_locale(session, session_key),
          {:ok, locale} <- Localize.validate_locale(locale) do
       Localize.put_locale(locale)
       Enum.each(gettext_backends, &put_gettext_locale(&1, locale))
@@ -103,7 +107,7 @@ defmodule Localize.Plug do
   def live_session_locale(conn) do
     case Localize.Plug.PutLocale.get_locale(conn) do
       %Localize.LanguageTag{} = locale ->
-        %{@session_key => Localize.LanguageTag.to_string(locale)}
+        %{Localize.Plug.PutLocale.get_session_key(conn) => Localize.LanguageTag.to_string(locale)}
 
       _other ->
         %{}
@@ -141,6 +145,21 @@ defmodule Localize.Plug do
       end
     else
       invalid_value(options, "a keyword list of options")
+    end
+  end
+
+  # `gettext_backends/1` has already checked that the options are a keyword list.
+  defp session_key(options) do
+    case Keyword.get(options, :session_key, @session_key) do
+      session_key when is_binary(session_key) and byte_size(session_key) > 0 -> {:ok, session_key}
+      other -> invalid_value(other, "a non-empty string session key")
+    end
+  end
+
+  defp session_locale(session, session_key) do
+    case Map.fetch(session, session_key) do
+      {:ok, locale} -> {:ok, locale}
+      :error -> {:error, %NoSessionLocaleError{}}
     end
   end
 

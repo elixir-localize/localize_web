@@ -149,6 +149,53 @@ defmodule Localize.Plug.PutSessionTest do
     test "uses the standard session key" do
       assert PutLocale.session_key() == "localize_locale"
     end
+
+    test "writes under the key PutLocale was given, and leaves the standard key alone" do
+      conn =
+        :get
+        |> conn("/?locale=de")
+        |> put_in([Access.key(:secret_key_base)], String.duplicate("X", 64))
+        |> Plug.Session.call(@session_options)
+        |> fetch_session()
+        |> PutLocale.call(PutLocale.init(from: [:query], session_key: "admin_locale"))
+        |> PutSession.call(PutSession.init())
+
+      assert PutLocale.get_session_key(conn) == "admin_locale"
+      assert get_session(conn, "admin_locale") == "de"
+      assert get_session(conn, "localize_locale") == nil
+      assert PutSession.stored?(conn)
+    end
+
+    test "PutLocale reads the session under its own key" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_in([Access.key(:secret_key_base)], String.duplicate("X", 64))
+        |> Plug.Session.call(@session_options)
+        |> fetch_session()
+        |> put_session("localize_locale", "fr")
+        |> put_session("admin_locale", "de")
+
+      admin = PutLocale.call(conn, PutLocale.init(from: [:session], session_key: "admin_locale"))
+      pages = PutLocale.call(conn, PutLocale.init(from: [:session]))
+
+      assert PutLocale.get_locale(admin).cldr_locale_id == :de
+      assert PutLocale.get_locale(pages).cldr_locale_id == :fr
+    end
+
+    test "PutLocale refuses a session key that is not a non-empty string" do
+      for session_key <- ["", :admin, 42, ["admin"]] do
+        assert_raise ArgumentError, ~r/:session_key must be a non-empty string/, fn ->
+          PutLocale.init(session_key: session_key)
+        end
+      end
+    end
+
+    test "get_session_key/1 is the standard key before PutLocale runs and for anything else" do
+      for value <- [conn(:get, "/"), nil, %{}, "conn"] do
+        assert PutLocale.get_session_key(value) == "localize_locale"
+      end
+    end
   end
 
   describe "round-trip: session write then read" do

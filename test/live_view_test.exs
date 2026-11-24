@@ -106,6 +106,20 @@ defmodule Localize.LiveViewTest do
                    end
     end
 
+    test "raises when :session_key is not a non-empty string" do
+      for session_key <- ["\"\"", "42", ":admin"] do
+        assert_raise ArgumentError, ~r/expects :session_key to be a non-empty string/, fn ->
+          compile_router("""
+          localize_live_session :bad, session_key: #{session_key} do
+            localize do
+              live "/\#{locale}/video", MyAppWeb.LocaleLive
+            end
+          end
+          """)
+        end
+      end
+    end
+
     test "raises when the options are not a keyword list" do
       assert_raise ArgumentError, ~r/expects its options as a keyword list/, fn ->
         compile_router("""
@@ -153,17 +167,57 @@ defmodule Localize.LiveViewTest do
     end
   end
 
-  describe "__live_session__/3" do
-    test "adds the locale to no session, a map and an MFA" do
+  describe "__live_session__/4" do
+    test "adds the locale under the session key to no session, a map and an MFA" do
       conn = build_conn()
+      key = "localize_locale"
 
-      assert Localize.Routes.__live_session__(conn, "fr", nil) == %{"localize_locale" => "fr"}
+      assert Localize.Routes.__live_session__(conn, "fr", nil, key) == %{key => "fr"}
 
-      assert Localize.Routes.__live_session__(conn, "fr", %{"a" => 1}) ==
-               %{"a" => 1, "localize_locale" => "fr"}
+      assert Localize.Routes.__live_session__(conn, "fr", %{"a" => 1}, key) ==
+               %{"a" => 1, key => "fr"}
 
-      assert Localize.Routes.__live_session__(conn, "fr", {MyAppWeb.LocaleHook, :session, ["x"]}) ==
-               %{"extra" => "x", "localize_locale" => "fr"}
+      assert Localize.Routes.__live_session__(
+               conn,
+               "fr",
+               {MyAppWeb.LocaleHook, :session, ["x"]},
+               key
+             ) ==
+               %{"extra" => "x", key => "fr"}
+
+      assert Localize.Routes.__live_session__(conn, "fr", nil, "page_locale") == %{
+               "page_locale" => "fr"
+             }
+    end
+  end
+
+  describe "a session key of its own" do
+    test "the admin stores and reads its locale under its own key" do
+      conn = get(build_conn(), "/admin/dashboard?locale=de")
+
+      assert text(html_response(conn, 200), "locale") == "de"
+      assert Plug.Conn.get_session(conn, "admin_locale") == "de"
+      assert Plug.Conn.get_session(conn, "localize_locale") == nil
+
+      {:ok, _view, html} = live(conn)
+      assert text(html, "locale") == "de"
+      assert text(html, "gettext") == "de"
+    end
+
+    test "the pages and the admin keep two locales apart" do
+      admin = get(build_conn(), "/admin/dashboard?locale=de")
+      pages = get(recycle(admin), "/live?locale=fr")
+
+      assert Plug.Conn.get_session(pages, "localize_locale") == "fr"
+      assert Plug.Conn.get_session(pages, "admin_locale") == "de"
+
+      admin_again = get(recycle(pages), "/admin/dashboard")
+      assert text(html_response(admin_again, 200), "locale") == "de"
+    end
+
+    test "a localized live session puts the route's locale under the key" do
+      {:ok, _view, html} = live(build_conn(), "/de/keyed")
+      assert text(html, "locale") == "de"
     end
   end
 

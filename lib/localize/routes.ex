@@ -352,11 +352,13 @@ defmodule Localize.Routes do
 
   * `:session` is a map or a `{module, function, args}` tuple, as for `Phoenix.LiveView.Router.live_session/3`. The locale of each live session is added to the session it produces.
 
+  * `:session_key` is the key the locale is added under, the `:session_key` given to `Localize.Plug.PutLocale` and to `Localize.Plug.put_locale_from_session/2`. It is not passed to `Phoenix.LiveView.Router.live_session/3`. The default is `"#{Localize.Plug.PutLocale.session_key()}"`.
+
   ### Returns
 
   * One `Phoenix.LiveView.Router.live_session/3` definition per locale known to the Gettext backend, each holding the block's routes for that locale.
 
-  * Raises `ArgumentError` at compile time when `options` is not a keyword list, or when a route in the block is not inside a `localize` block.
+  * Raises `ArgumentError` at compile time when `options` is not a keyword list, when `:session_key` is not a non-empty string, or when a route in the block is not inside a `localize` block.
 
   ### Examples
 
@@ -382,6 +384,15 @@ defmodule Localize.Routes do
               Macro.to_string(options)
     end
 
+    {session_key, options} =
+      Keyword.pop(options, :session_key, Localize.Plug.PutLocale.session_key())
+
+    if not (is_binary(session_key) and byte_size(session_key) > 0) do
+      raise ArgumentError,
+            "localize_live_session/3 expects :session_key to be a non-empty string, got: " <>
+              Macro.to_string(session_key)
+    end
+
     live_sessions =
       for locale <- locales_from_gettext(gettext_backend),
           match?({:ok, _}, Localize.Locale.gettext_locale_id(locale, gettext_backend)) do
@@ -393,7 +404,11 @@ defmodule Localize.Routes do
         session =
           quote do
             {Localize.Routes, :__live_session__,
-             [unquote(session_locale), unquote(Keyword.get(options, :session))]}
+             [
+               unquote(session_locale),
+               unquote(Keyword.get(options, :session)),
+               unquote(session_key)
+             ]}
           end
 
         quote location: :keep do
@@ -412,7 +427,7 @@ defmodule Localize.Routes do
   @doc false
   # The session of a live session made by `localize_live_session/3`:
   # the caller's own `:session`, if any, with the locale added.
-  def __live_session__(conn, locale, session) do
+  def __live_session__(conn, locale, session, session_key) do
     session =
       case session do
         {module, function, args} -> apply(module, function, [conn | args])
@@ -420,7 +435,7 @@ defmodule Localize.Routes do
         nil -> %{}
       end
 
-    Map.put(session, Localize.Plug.PutLocale.session_key(), locale)
+    Map.put(session, session_key, locale)
   end
 
   # Expands one locale into a `localize/2` call carrying both the

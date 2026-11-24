@@ -6,6 +6,17 @@ defmodule MyAppWeb.LocaleHook do
     {:cont, socket}
   end
 
+  # A pipeline that keeps its locale under a session key of its own.
+  def on_mount(:admin, _params, session, socket) do
+    _ =
+      Localize.Plug.put_locale_from_session(session,
+        gettext: MyApp.Gettext,
+        session_key: "admin_locale"
+      )
+
+    {:cont, socket}
+  end
+
   def session(_conn, value), do: %{"extra" => value}
 end
 
@@ -71,6 +82,38 @@ defmodule MyApp.LiveRouter do
 
     live_session :plain, on_mount: MyAppWeb.LocaleHook do
       live("/live", LocaleLive)
+    end
+
+    localize_live_session :keyed,
+      on_mount: {MyAppWeb.LocaleHook, :admin},
+      session_key: "admin_locale" do
+      localize "de" do
+        live("/#{locale}/keyed", LocaleLive)
+      end
+    end
+  end
+
+  # An admin that keeps its own locale, under a session key of its own, beside
+  # the locale of the pages.
+  pipeline :admin do
+    plug(:fetch_session)
+
+    plug(Localize.Plug.PutLocale,
+      from: [:query, :session],
+      gettext: MyApp.Gettext,
+      session_key: "admin_locale"
+    )
+
+    plug(Localize.Plug.PutSession)
+  end
+
+  scope "/admin", MyAppWeb do
+    pipe_through(:admin)
+
+    live_session :admin,
+      on_mount: {MyAppWeb.LocaleHook, :admin},
+      session: {Localize.Plug, :live_session_locale, []} do
+      live("/dashboard", LocaleLive)
     end
   end
 

@@ -1,6 +1,7 @@
 defmodule Localize.Plug.PutLocale do
   @private_key :localize_locale
   @source_key :localize_locale_source
+  @session_key_private :localize_session_key
   @session_key "localize_locale"
 
   @default_from [:route, :path, :query, :session, :accept_language]
@@ -74,6 +75,8 @@ defmodule Localize.Plug.PutLocale do
 
   * `:supported` is the list of locales the request is matched against, for an application whose locales are known only at runtime, such as a site whose languages are kept in a database. Each entry is a locale identifier string or atom, or a `t:Localize.LanguageTag.t/0`, and should be a locale Localize is configured for, or its data falls back to another locale. It may also be a `{Module, function}` or `{Module, function, args}` tuple, whose function is called with the `conn` and the plug's options, followed by `args`, and returns the list: a function that returns anything else is logged, and no locale is taken from the request. The locale found is then the entry that matched, so `?locale=fr-CA` with `supported: ["en", "fr"]` sets `fr`, and every source is matched against the list but two, which are taken as they stand (`:path_prefix` must name an entry exactly): the tag a localized route stores, and the locale a `{Module, function}` or `{Module, function, args}` source returns. Such a source finds the list in its options under `:supported`. The `:default` locale is not matched. The default is the locales configured for Localize.
 
+  * `:session_key` is the session key the `:session` source reads, as a non-empty string. `Localize.Plug.PutSession` writes the locale under the same key and `Localize.Plug.live_session_locale/1` hands it to a LiveView under it; `get_session_key/1` returns it. Two pipelines with different keys keep two locales apart, such as a site's pages and its admin. The default is `"#{@session_key}"`.
+
   * `:vary` is `true` or `false`, and says whether the plug adds the `vary` header described above. The default is `true`. With `false` the plug adds none, and the application declares how its responses vary: for example where a cache inside the application keys on a request header the application derives from the session. A shared cache that is told nothing serves one visitor's language to another.
 
   ### Examples
@@ -144,6 +147,7 @@ defmodule Localize.Plug.PutLocale do
     |> validate_default(options[:default])
     |> validate_vary(options[:vary])
     |> validate_supported(options[:supported])
+    |> validate_session_key(options[:session_key])
   end
 
   @doc false
@@ -152,7 +156,11 @@ defmodule Localize.Plug.PutLocale do
     {found, consulted} = locale_from_params(conn, options[:from], options)
     source = source(found, consulted)
     locale = found || default(conn, options)
-    conn = put_vary(conn, consulted, options[:vary])
+
+    conn =
+      conn
+      |> put_vary(consulted, options[:vary])
+      |> put_private(@session_key_private, options[:session_key])
 
     if locale do
       Localize.put_locale(locale)
@@ -223,6 +231,34 @@ defmodule Localize.Plug.PutLocale do
 
   """
   def session_key do
+    @session_key
+  end
+
+  @doc """
+  Returns the session key `Localize.Plug.PutLocale` read for a request.
+
+  `Localize.Plug.PutSession` writes the locale under this key and `Localize.Plug.live_session_locale/1` hands it to a LiveView under it, so the key is configured once, with the `:session_key` option of `Localize.Plug.PutLocale`.
+
+  ### Arguments
+
+  * `conn` is a `t:Plug.Conn.t/0`.
+
+  ### Returns
+
+  * The session key as a string: the plug's `:session_key` option, or `session_key/0` when the plug has not run or `conn` is not a `t:Plug.Conn.t/0`.
+
+  ### Examples
+
+      iex> Localize.Plug.PutLocale.get_session_key(%Plug.Conn{})
+      "localize_locale"
+
+  """
+  @spec get_session_key(term()) :: String.t()
+  def get_session_key(%Plug.Conn{private: private}) do
+    Map.get(private, @session_key_private, @session_key)
+  end
+
+  def get_session_key(_conn) do
     @session_key
   end
 
@@ -465,7 +501,7 @@ defmodule Localize.Plug.PutLocale do
 
   defp fetch_param(conn, :session, _param, options) do
     conn
-    |> get_session(@session_key)
+    |> get_session(options[:session_key])
     |> validate_locale_param(options[:supported])
   end
 
@@ -822,5 +858,19 @@ defmodule Localize.Plug.PutLocale do
   defp validate_vary(_options, vary) do
     raise ArgumentError,
           "Invalid :vary #{inspect(vary)} detected. :vary must be true or false"
+  end
+
+  defp validate_session_key(options, nil) do
+    Keyword.put(options, :session_key, @session_key)
+  end
+
+  defp validate_session_key(options, session_key)
+       when is_binary(session_key) and byte_size(session_key) > 0 do
+    options
+  end
+
+  defp validate_session_key(_options, session_key) do
+    raise ArgumentError,
+          "Invalid :session_key #{inspect(session_key)} detected. :session_key must be a non-empty string"
   end
 end

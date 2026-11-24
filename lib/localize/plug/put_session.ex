@@ -2,7 +2,7 @@ defmodule Localize.Plug.PutSession do
   @moduledoc """
   Plug that persists the locale discovered by `Localize.Plug.PutLocale` into the session.
 
-  The session key is fixed to `"#{Localize.Plug.PutLocale.session_key()}"` so that downstream functions like LiveView `on_mount` callbacks can retrieve the locale without needing additional configuration.
+  The locale is stored under the session key `Localize.Plug.PutLocale` read, `"#{Localize.Plug.PutLocale.session_key()}"` unless its `:session_key` option names another, so that the plug and LiveView `on_mount` callbacks agree on it without configuring it twice. `Localize.Plug.PutLocale.get_session_key/1` returns the key for a request.
 
   By default every locale is stored, whatever source it came from. That includes a locale that was only inferred from the `accept-language` header, so a first visit writes the session and its response sets a cookie. The `:from` option stores a locale only when the visitor chose it.
 
@@ -133,12 +133,13 @@ defmodule Localize.Plug.PutSession do
   # that a response sets the session cookie no more often than it must.
   defp put_locale(conn, locale) do
     conn = fetch_session(conn)
+    session_key = PutLocale.get_session_key(conn)
 
-    if get_session(conn, PutLocale.session_key()) == locale do
+    if get_session(conn, session_key) == locale do
       conn
     else
       conn
-      |> put_session(PutLocale.session_key(), locale)
+      |> put_session(session_key, locale)
       |> put_private(@stored_key, true)
     end
   end
