@@ -15,9 +15,13 @@ defmodule Localize.Plug.AcceptLanguage do
   * `:no_match_log_level` determines the logging level for the case when no matching locale is configured to meet the user's
     request. The default is `:warning`. If set to `nil` then no logging is performed.
 
+  * `:supported` is the list of locales the header is matched against, as for `Localize.AcceptLanguage.best_match/2`. It may also be a `{Module, function}` or `{Module, function, args}` tuple, whose function is called with the `conn` and the plug's options, followed by `args`, and returns the list, for an application that learns its locales from the request: a site found from the host, whose languages are kept in a database. The locale set is then the entry that matched. The default is the locales configured for Localize.
+
   ### Examples
 
       plug Localize.Plug.AcceptLanguage
+
+      plug Localize.Plug.AcceptLanguage, supported: {MyApp.Sites, :locales}
 
   """
 
@@ -30,11 +34,14 @@ defmodule Localize.Plug.AcceptLanguage do
   @doc false
   def init(options \\ []) do
     log_level = Keyword.get(options, :no_match_log_level, @default_log_level)
-    %{log_level: log_level}
+    supported = Localize.Plug.PutLocale.supported_option(Keyword.get(options, :supported))
+    %{log_level: log_level, supported: supported}
   end
 
   @doc false
   def call(conn, options) do
+    options = %{options | supported: Localize.Plug.PutLocale.supported_locales(conn, options)}
+
     case get_req_header(conn, @language_header) do
       [accept_language | _] ->
         put_private(conn, :localize_locale, best_match(accept_language, options))
@@ -51,7 +58,7 @@ defmodule Localize.Plug.AcceptLanguage do
 
   * `accept_language` is an accept-language header string or `nil`.
 
-  * `options` is the plug options map containing `:log_level`.
+  * `options` is the plug options map containing `:log_level` and, optionally, `:supported`, a list of locales to match against. Without `:supported`, or with `nil`, the header is matched against the locales configured for Localize.
 
   ### Returns
 
@@ -63,7 +70,9 @@ defmodule Localize.Plug.AcceptLanguage do
   end
 
   def best_match(accept_language, options) do
-    case Localize.AcceptLanguage.best_match(accept_language) do
+    supported = Map.get(options, :supported)
+
+    case Localize.AcceptLanguage.best_match(accept_language, supported: supported) do
       {:ok, locale} ->
         locale
 

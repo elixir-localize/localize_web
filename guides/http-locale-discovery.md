@@ -98,7 +98,28 @@ A locale in the URL is an explicit choice, so it wins over the session and the b
 
 The first source that yields a valid locale wins. Remaining sources are not consulted.
 
-A source yields a locale only when what it holds matches a locale the application supports. An identifier that is valid and matches none is passed over, and the next source is consulted: `?locale=pt` where Portuguese is not supported, or `?locale=tlh`, a language CLDR has no data for. `Localize.validate_locale/1` would answer for both, with the first supported locale and with the root locale `und`, which are right for formatting and are not what the visitor asked for. The root locale is taken when it is asked for by name, as `und`.
+A source yields a locale only when what it holds matches a locale the application supports. An identifier that is valid and matches none is passed over, and the next source is consulted: `?locale=pt` where Portuguese is not supported, or `?locale=tlh`, a language CLDR has no data for. `Localize.validate_locale/1` would answer for both, with the first supported locale and with the root locale `und`, which are right for formatting and are not what the visitor asked for. The root locale is taken when it is asked for by name, as `und`. The locale of a host's territory is tested the same way, so `example.br` yields nothing where Portuguese is not supported.
+
+### Locales known only at runtime
+
+The supported locales are those configured for Localize by default. An application that serves a different set of locales per request, such as one site among many whose languages are kept in a database, gives the plug its own list with the `:supported` option. A function named by a `{Module, function}` tuple is called with the `conn` and the plug's options and returns the list for that request:
+
+```elixir
+plug Localize.Plug.PutLocale,
+  from: [:path, :session, :accept_language],
+  supported: {MyApp.Sites, :locales}
+```
+
+```elixir
+defmodule MyApp.Sites do
+  def locales(conn, _options) do
+    site = MyApp.Sites.for_host(conn.host)
+    site.locale_codes
+  end
+end
+```
+
+The URL, the session, the accept-language header and every other source but a localized route and a `{Module, function}` source are then matched against the list, and the locale found is the entry that matched: `accept-language: de-CH, en;q=0.5` with `["en", "fr"]` sets `en`, where matching against configured locales that include German would have set a `de-CH` tag. Each entry should be a locale Localize is configured for, since one that is not is formatted with another locale's data. `Localize.Plug.AcceptLanguage` takes the same option, and `Localize.AcceptLanguage.best_match/2` takes a list.
 
 ### The :param Option
 

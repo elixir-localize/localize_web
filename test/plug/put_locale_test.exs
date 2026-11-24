@@ -873,4 +873,167 @@ defmodule Localize.Plug.PutLocaleTest do
       assert PutLocale.get_locale_source(conn) == :default
     end
   end
+
+  describe "call/2 - a list of supported locales" do
+    @identifier_sources %{
+      query: &__MODULE__.in_query/1,
+      path: &__MODULE__.in_path/1,
+      body: &__MODULE__.in_body/1,
+      cookie: &__MODULE__.in_cookie/1,
+      session: &__MODULE__.in_session/1,
+      route: &__MODULE__.in_route/1
+    }
+
+    def site_locales(%Plug.Conn{host: "example.de"}, _options) do
+      ["de", "en"]
+    end
+
+    def site_locales(%Plug.Conn{}, _options) do
+      ["en", "fr"]
+    end
+
+    def not_a_list(%Plug.Conn{}, _options) do
+      {:ok, ["en"]}
+    end
+
+    # A `:from` source that hands back the list it was given, as the
+    # locale `ja` when the list was resolved and `th` when it was not.
+    def from_supported(%Plug.Conn{}, options) do
+      if is_list(options[:supported]) do
+        Localize.validate_locale("ja")
+      else
+        Localize.validate_locale("th")
+      end
+    end
+
+    defp call_with(conn, options) do
+      PutLocale.call(conn, PutLocale.init(options))
+    end
+
+    test "takes an identifier that matches an entry, as that entry, from every source" do
+      {:ok, french} = Localize.validate_locale("fr")
+
+      for {source, build} <- @identifier_sources, value <- ["fr", "fr-CA", "FR_ch"] do
+        conn = call_with(build.(value), from: [source], supported: ["en", "fr"])
+
+        assert {source, value, PutLocale.get_locale(conn)} == {source, value, french}
+
+        assert PutLocale.get_locale_source(conn) == source
+      end
+    end
+
+    test "passes over an identifier that matches no entry, so the next source decides" do
+      for {source, build} <- @identifier_sources, value <- ["de", "it-CH", "und", "tlh"] do
+        conn =
+          value
+          |> build.()
+          |> put_req_header("accept-language", "fr")
+          |> call_with(from: [source, :accept_language], supported: ["en", "fr"])
+
+        assert {source, value, PutLocale.get_locale(conn).cldr_locale_id} ==
+                 {source, value, :fr}
+
+        assert PutLocale.get_locale_source(conn) == :accept_language
+      end
+    end
+
+    test "keeps a validated tag from the route as it stands" do
+      {:ok, german} = Localize.validate_locale("de")
+      conn = call_with(in_route(german), from: [:route], supported: ["en", "fr"])
+
+      assert PutLocale.get_locale(conn) == german
+    end
+
+    test "matches the accept-language header against the list" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_req_header("accept-language", "de-CH, it;q=0.9, en;q=0.5")
+        |> call_with(from: [:accept_language], supported: ["en", "fr"])
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :en
+    end
+
+    test "takes the host's locale only when it matches an entry" do
+      conn = call_with(conn(:get, "http://example.fr/"), from: [:host], supported: ["en", "fr"])
+      assert PutLocale.get_locale(conn).cldr_locale_id == :fr
+      assert PutLocale.get_locale_source(conn) == :host
+
+      conn = call_with(conn(:get, "http://example.de/"), from: [:host], supported: ["en", "fr"])
+      assert PutLocale.get_locale(conn) == @default_locale
+      assert PutLocale.get_locale_source(conn) == :default
+    end
+
+    test "calls a function with the request for the list" do
+      supported = {__MODULE__, :site_locales}
+
+      for {host, expected} <- [{"example.de", :de}, {"example.fr", :fr}] do
+        conn =
+          :get
+          |> conn("http://#{host}/?locale=de")
+          |> put_req_header("accept-language", "fr")
+          |> call_with(from: [:query, :accept_language], supported: supported)
+
+        assert {host, PutLocale.get_locale(conn).cldr_locale_id} == {host, expected}
+      end
+    end
+
+    test "gives a {Module, function} source the resolved list" do
+      conn =
+        call_with(conn(:get, "/"),
+          from: [{__MODULE__, :from_supported}],
+          supported: {__MODULE__, :site_locales}
+        )
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :ja
+    end
+
+    test "takes no locale from the request when the function returns something other than a list" do
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          conn =
+            :get
+            |> conn("/?locale=en")
+            |> put_req_header("accept-language", "en")
+            |> call_with(from: [:query, :accept_language], supported: {__MODULE__, :not_a_list})
+
+          assert PutLocale.get_locale_source(conn) == :default
+        end)
+
+      assert log =~ "for the :supported option"
+    end
+
+    @tag :capture_log
+    test "takes no locale from the request with an empty list" do
+      conn =
+        :get
+        |> conn("/?locale=en")
+        |> put_req_header("accept-language", "en")
+        |> call_with(from: [:query, :accept_language], supported: [])
+
+      assert PutLocale.get_locale_source(conn) == :default
+    end
+
+    test "init/1 raises for a value that is not a list or a function" do
+      for supported <- ["en", :en, %{}, {"Module", :function}, [1], [%{}]] do
+        assert_raise ArgumentError, ~r/Invalid :supported/, fn ->
+          PutLocale.init(supported: supported)
+        end
+      end
+    end
+  end
+
+  describe "call/2 - a host whose locale the application does not support" do
+    test "is a miss, so the next source decides" do
+      # Brazil's language, Portuguese, is not a configured locale.
+      conn =
+        :get
+        |> conn("http://example.br/")
+        |> put_req_header("accept-language", "fr")
+        |> PutLocale.call(PutLocale.init(from: [:host, :accept_language]))
+
+      assert PutLocale.get_locale(conn).cldr_locale_id == :fr
+      assert PutLocale.get_locale_source(conn) == :accept_language
+    end
+  end
 end

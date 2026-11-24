@@ -12,6 +12,8 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## Done
 
+* [x] **Supported locales known only at runtime** — `PutLocale` and `Plug.AcceptLanguage` take `:supported` (a list or a function of the request) and `AcceptLanguage.best_match/2` a list; the host source is now matched too. 2026-11-24, unreleased (1.5.0).
+
 * [x] **A locale the application does not support is passed over** — `PutLocale` takes an identifier from the URL, a form, a cookie or the session only when it matches a supported locale, as `accept-language` did, so `?locale=tlh` no longer resolves to `und` nor `?locale=pt` to the first supported locale. Localize is right to answer for both when formatting; the fault was taking its answer as a match. 2026-11-17, v1.4.0.
 
 * [x] **Store only a locale the visitor chose** — `Localize.Plug.PutSession` takes `:from`, `Localize.Plug.PutLocale.get_locale_source/1` says which source decided, and `Localize.Plug.live_session_locale/1` hands a connected LiveView the locale without the cookie. 2026-11-17, v1.4.0.

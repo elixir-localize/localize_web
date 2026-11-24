@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — Unreleased
+
+### Added
+
+* `Localize.Plug.PutLocale` and `Localize.Plug.AcceptLanguage` take a `:supported` option: a list of locales, or a `{Module, function}` called with the `conn`, for an application whose locales are known only at runtime. Every source is matched against it and the entry that matched is the locale.
+
+* `Localize.AcceptLanguage.best_match/2` takes a `:supported` list and returns the entry that matched.
+
+### Fixed
+
+* `Localize.Plug.PutLocale` takes the locale of a host's territory only when it matches a supported locale, as it does for an identifier in the request. `example.br` where Portuguese is not supported resolved to a Portuguese tag carrying the first supported locale's data.
+
 ## [1.4.0] — 2026-11-18
 
 ### Added

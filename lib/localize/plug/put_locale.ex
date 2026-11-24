@@ -11,7 +11,7 @@ defmodule Localize.Plug.PutLocale do
 
   The locale can be derived from the accept-language header, a query parameter, a URL parameter, a body parameter, a cookie, the route, the session, or the hostname TLD. Sources are checked in the order specified by the `:from` option, and the first successful match wins.
 
-  A source counts only when what it holds matches a locale the application supports. An identifier that is valid but matches none, such as `pt` where Portuguese is not supported, is passed over and the next source is checked.
+  A source counts only when what it holds matches a locale the application supports. An identifier that is valid but matches none, such as `pt` where Portuguese is not supported, is passed over and the next source is checked. The same holds for the locale of a host's territory. The supported locales are those configured for Localize, or the list given with the `:supported` option, for an application whose locales are known only at runtime.
 
   When a locale is found, `Localize.put_locale/1` is always called to set the process locale. If Gettext backends are configured, the locale is also set on each backend.
 
@@ -70,6 +70,8 @@ defmodule Localize.Plug.PutLocale do
 
   * `:param` is the name of the parameter to look for in the query, path, body, or cookie. The default is `"locale"`.
 
+  * `:supported` is the list of locales the request is matched against, for an application whose locales are known only at runtime, such as a site whose languages are kept in a database. Each entry is a locale identifier string or atom, or a `t:Localize.LanguageTag.t/0`, and should be a locale Localize is configured for, or its data falls back to another locale. It may also be a `{Module, function}` or `{Module, function, args}` tuple, whose function is called with the `conn` and the plug's options, followed by `args`, and returns the list: a function that returns anything else is logged, and no locale is taken from the request. The locale found is then the entry that matched, so `?locale=fr-CA` with `supported: ["en", "fr"]` sets `fr`, and every source is matched against the list but two, which are taken as they stand: the tag a localized route stores, and the locale a `{Module, function}` or `{Module, function, args}` source returns. Such a source finds the list in its options under `:supported`. The `:default` locale is not matched. The default is the locales configured for Localize.
+
   * `:vary` is `true` or `false`, and says whether the plug adds the `vary` header described above. The default is `true`. With `false` the plug adds none, and the application declares how its responses vary: for example where a cache inside the application keys on a request header the application derives from the session. A shared cache that is told nothing serves one visitor's language to another.
 
   ### Examples
@@ -86,6 +88,10 @@ defmodule Localize.Plug.PutLocale do
       plug Localize.Plug.PutLocale,
         from: [:route, :session, :accept_language],
         vary: false
+
+      plug Localize.Plug.PutLocale,
+        from: [:path, :session, :accept_language],
+        supported: {MyApp.Sites, :locales}
 
   """
 
@@ -134,10 +140,12 @@ defmodule Localize.Plug.PutLocale do
     |> validate_gettext(options[:gettext])
     |> validate_default(options[:default])
     |> validate_vary(options[:vary])
+    |> validate_supported(options[:supported])
   end
 
   @doc false
   def call(conn, options) do
+    options = Keyword.put(options, :supported, supported_locales(conn, options))
     {found, consulted} = locale_from_params(conn, options[:from], options)
     source = source(found, consulted)
     locale = found || default(conn, options)
@@ -404,10 +412,13 @@ defmodule Localize.Plug.PutLocale do
   defp vary_fields(source) when source in [:session, :cookie], do: ["cookie"]
   defp vary_fields(_source), do: []
 
-  defp fetch_param(conn, :accept_language, _param, _options) do
+  defp fetch_param(conn, :accept_language, _param, options) do
     case get_req_header(conn, @language_header) do
-      [accept_language | _] -> Localize.AcceptLanguage.best_match(accept_language)
-      [] -> nil
+      [accept_language | _] ->
+        Localize.AcceptLanguage.best_match(accept_language, supported: options[:supported])
+
+      [] ->
+        nil
     end
   end
 
@@ -421,51 +432,52 @@ defmodule Localize.Plug.PutLocale do
     fetch_param(conn, :query, param, options)
   end
 
-  defp fetch_param(conn, :query, param, _options) do
+  defp fetch_param(conn, :query, param, options) do
     conn
     |> Map.get(:query_params)
     |> Map.get(param)
-    |> validate_locale_param()
+    |> validate_locale_param(options[:supported])
   end
 
-  defp fetch_param(conn, :path, param, _options) do
+  defp fetch_param(conn, :path, param, options) do
     conn
     |> Map.get(:path_params)
     |> Map.get(param)
-    |> validate_locale_param()
+    |> validate_locale_param(options[:supported])
   end
 
-  defp fetch_param(conn, :body, param, _options) do
+  defp fetch_param(conn, :body, param, options) do
     conn
     |> Map.get(:body_params)
     |> Map.get(param)
-    |> validate_locale_param()
+    |> validate_locale_param(options[:supported])
   end
 
-  defp fetch_param(conn, :session, _param, _options) do
+  defp fetch_param(conn, :session, _param, options) do
     conn
     |> get_session(@session_key)
-    |> validate_locale_param()
+    |> validate_locale_param(options[:supported])
   end
 
-  defp fetch_param(conn, :cookie, param, _options) do
+  defp fetch_param(conn, :cookie, param, options) do
     conn
     |> Map.get(:cookies)
     |> Map.get(param)
-    |> validate_locale_param()
+    |> validate_locale_param(options[:supported])
   end
 
   defp fetch_param(conn, :host, _param, options) do
     conn
     |> Map.get(:host)
     |> locale_from_host(Keyword.take(options, [:generic_tlds]))
+    |> supported_host_locale(options[:supported])
   end
 
-  defp fetch_param(conn, :route, _param, _options) do
+  defp fetch_param(conn, :route, _param, options) do
     conn
     |> Map.fetch!(:private)
     |> Map.get(@private_key)
-    |> validate_locale_param()
+    |> validate_locale_param(options[:supported])
   end
 
   defp fetch_param(conn, {module, function, args}, _param, options) do
@@ -476,13 +488,38 @@ defmodule Localize.Plug.PutLocale do
     apply(module, function, [conn, options])
   end
 
-  defp validate_locale_param(nil), do: nil
+  # A territory's locale is a hit only when it matches a supported locale,
+  # as an identifier in the request is. Without the test, a territory whose
+  # language is not supported resolved to the first supported locale.
+  defp supported_host_locale({:ok, locale}, supported) do
+    Localize.AcceptLanguage.supported_match(locale, supported)
+  end
+
+  defp supported_host_locale(other, _supported) do
+    other
+  end
+
+  defp validate_locale_param(nil, _supported) do
+    nil
+  end
 
   # The router, `Localize.Plug.AcceptLanguage` and this plug each store a tag
   # they validated, so a tag found here is trusted as it stands.
-  defp validate_locale_param(%Localize.LanguageTag{cldr_locale_id: id} = locale)
-       when not is_nil(id),
-       do: {:ok, locale}
+  defp validate_locale_param(%Localize.LanguageTag{cldr_locale_id: id} = locale, _supported)
+       when not is_nil(id) do
+    {:ok, locale}
+  end
+
+  # With a list of supported locales, an identifier is a hit when it
+  # matches an entry, and the entry is the locale. The root locale is a hit
+  # only when the list holds it.
+  defp validate_locale_param(locale, [_ | _] = supported) do
+    Localize.AcceptLanguage.supported_match(locale, supported)
+  end
+
+  defp validate_locale_param(_locale, []) do
+    nil
+  end
 
   # An identifier from the request is a hit only when it matches a locale
   # the application supports, by the test `Localize.AcceptLanguage` applies
@@ -493,7 +530,7 @@ defmodule Localize.Plug.PutLocale do
   # `fr` are supported. Both are right for formatting and neither is what
   # the visitor asked for, so they are misses and the next source is tried.
   # The root locale is kept when it is what was asked for.
-  defp validate_locale_param(locale) do
+  defp validate_locale_param(locale, nil) do
     if root_requested?(locale) do
       Localize.validate_locale(locale)
     else
@@ -517,12 +554,12 @@ defmodule Localize.Plug.PutLocale do
     if Atom.to_string(locale_id) == locale do
       {:ok, tag}
     else
-      Localize.AcceptLanguage.supported_match(tag)
+      Localize.AcceptLanguage.supported_match(tag, nil)
     end
   end
 
   defp supported_match(tag, _locale) do
-    Localize.AcceptLanguage.supported_match(tag)
+    Localize.AcceptLanguage.supported_match(tag, nil)
   end
 
   # Whether an identifier names the root locale: its language subtag is
@@ -640,6 +677,86 @@ defmodule Localize.Plug.PutLocale do
     end)
 
     Keyword.put(options, :gettext, backends)
+  end
+
+  defp validate_supported(options, supported) do
+    Keyword.put(options, :supported, supported_option(supported))
+  end
+
+  @doc false
+  # Validates a `:supported` option when a plug is initialised, which in a
+  # Phoenix router is at compile time. Entries are checked for their type
+  # only: validating them as locales would load CLDR data into the
+  # compiler. `Localize.Plug.AcceptLanguage` validates its own option here.
+  def supported_option(nil) do
+    nil
+  end
+
+  def supported_option(supported) when is_list(supported) do
+    Enum.each(supported, fn entry ->
+      if not supported_entry?(entry) do
+        raise ArgumentError,
+              "Invalid :supported entry #{inspect(entry)} detected. Each entry must be " <>
+                "a locale identifier string or atom, or a Localize.LanguageTag"
+      end
+    end)
+
+    supported
+  end
+
+  def supported_option({module, function, args} = supported)
+      when is_atom(module) and is_atom(function) and is_list(args) do
+    supported
+  end
+
+  def supported_option({module, function}) when is_atom(module) and is_atom(function) do
+    {module, function, []}
+  end
+
+  def supported_option(supported) do
+    raise ArgumentError,
+          "Invalid :supported #{inspect(supported)} detected. :supported must be a list " <>
+            "of locales, or a {Module, function} or {Module, function, args} tuple"
+  end
+
+  defp supported_entry?(entry) when is_binary(entry) or is_atom(entry) do
+    true
+  end
+
+  defp supported_entry?(%Localize.LanguageTag{}) do
+    true
+  end
+
+  defp supported_entry?(_entry) do
+    false
+  end
+
+  @doc false
+  # The supported locales for a request: `nil` for the locales configured
+  # for Localize, or a list. A function is called with the `conn` and the
+  # plug's options. One that returns anything but a list is a defect in
+  # the application, and no locale is then taken from the request, so that
+  # a locale outside the application's own list is never chosen.
+  def supported_locales(conn, options) do
+    case options[:supported] do
+      {module, function, args} -> call_supported(conn, options, module, function, args)
+      supported -> supported
+    end
+  end
+
+  defp call_supported(conn, options, module, function, args) do
+    case apply(module, function, [conn, options | args]) do
+      supported when is_list(supported) ->
+        supported
+
+      other ->
+        Logger.warning(
+          "#{inspect(module)}.#{function} returned #{inspect(other)} for the :supported " <>
+            "option, where a list of locales is expected. No locale is taken from the request."
+        )
+
+        []
+    end
   end
 
   defp validate_vary(options, nil) do

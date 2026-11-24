@@ -9,17 +9,17 @@ defmodule Localize.Plug.AcceptLanguageTest do
   describe "init/1" do
     test "default options" do
       options = AcceptLanguage.init([])
-      assert options == %{log_level: :warning}
+      assert options == %{log_level: :warning, supported: nil}
     end
 
     test "accepts custom log level" do
       options = AcceptLanguage.init(no_match_log_level: :error)
-      assert options == %{log_level: :error}
+      assert options == %{log_level: :error, supported: nil}
     end
 
     test "accepts nil log level to disable logging" do
       options = AcceptLanguage.init(no_match_log_level: nil)
-      assert options == %{log_level: nil}
+      assert options == %{log_level: nil, supported: nil}
     end
   end
 
@@ -150,6 +150,89 @@ defmodule Localize.Plug.AcceptLanguageTest do
         |> AcceptLanguage.call(options)
 
       assert AcceptLanguage.get_locale(conn) == nil
+    end
+  end
+
+  describe "the :supported option" do
+    def supported_for_host(%Plug.Conn{host: "example.de"}, _options) do
+      ["de", "en"]
+    end
+
+    def supported_for_host(%Plug.Conn{}, _options) do
+      ["en", "fr"]
+    end
+
+    def supported_with_args(%Plug.Conn{}, _options, locales) do
+      locales
+    end
+
+    def not_a_list(%Plug.Conn{}, _options) do
+      :none
+    end
+
+    defp matched(conn, header, options) do
+      conn
+      |> put_req_header("accept-language", header)
+      |> AcceptLanguage.call(AcceptLanguage.init(options))
+      |> AcceptLanguage.get_locale()
+    end
+
+    test "init/1 keeps a list and completes a {Module, function} tuple" do
+      assert AcceptLanguage.init(supported: ["en", :fr]).supported == ["en", :fr]
+
+      assert AcceptLanguage.init(supported: {__MODULE__, :supported_for_host}).supported ==
+               {__MODULE__, :supported_for_host, []}
+    end
+
+    test "init/1 raises for a value that is not a list or a function" do
+      for supported <- ["en", :en, %{}, {"Module", :function}, [1], [%{}]] do
+        assert_raise ArgumentError, ~r/Invalid :supported/, fn ->
+          AcceptLanguage.init(supported: supported)
+        end
+      end
+    end
+
+    test "matches the header against a list" do
+      locale = matched(conn(:get, "/"), "de-CH,fr;q=0.8", supported: ["en", "fr"])
+
+      assert locale.cldr_locale_id == :fr
+    end
+
+    test "matches the header against the list a function returns for the request" do
+      supported = {__MODULE__, :supported_for_host}
+
+      assert matched(conn(:get, "http://example.de/"), "de-CH,fr;q=0.8", supported: supported).cldr_locale_id ==
+               :de
+
+      assert matched(conn(:get, "http://example.fr/"), "de-CH,fr;q=0.8", supported: supported).cldr_locale_id ==
+               :fr
+    end
+
+    test "passes the extra arguments of a {Module, function, args} tuple" do
+      supported = {__MODULE__, :supported_with_args, [["ja"]]}
+
+      assert matched(conn(:get, "/"), "ja-JP,en;q=0.5", supported: supported).cldr_locale_id ==
+               :ja
+    end
+
+    @tag :capture_log
+    test "sets no locale when no tag matches the list" do
+      assert matched(conn(:get, "/"), "de", supported: ["en", "fr"]) == nil
+    end
+
+    test "sets no locale, and logs, when the function returns something other than a list" do
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert matched(conn(:get, "/"), "en", supported: {__MODULE__, :not_a_list}) == nil
+        end)
+
+      assert log =~ "for the :supported option"
+    end
+
+    test "best_match/2 takes the list in its options map" do
+      locale = AcceptLanguage.best_match("de-CH,fr;q=0.8", %{log_level: nil, supported: ["fr"]})
+
+      assert locale.cldr_locale_id == :fr
     end
   end
 

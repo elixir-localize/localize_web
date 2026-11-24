@@ -10,6 +10,8 @@ defmodule Localize.AcceptLanguageTest do
 
   alias Localize.AcceptLanguage
 
+  doctest Localize.AcceptLanguage
+
   describe "tokenize/1" do
     test "simple single language" do
       assert [{1.0, "en"}] = AcceptLanguage.tokenize("en")
@@ -343,6 +345,81 @@ defmodule Localize.AcceptLanguageTest do
       # yields three elements. Now it uses the first weight.
       assert {:ok, %Localize.LanguageTag{language: :ja}} =
                AcceptLanguage.best_match(" ja-JP,ja;q=0.9;q=0.9,en;q=0.8;q=0.8")
+    end
+  end
+
+  describe "best_match/2 with a list of supported locales" do
+    test "returns the entry that matched, not the tag in the header" do
+      {:ok, english} = Localize.validate_locale("en")
+
+      assert AcceptLanguage.best_match("en-AU", supported: ["en", "de"]) == {:ok, english}
+    end
+
+    test "passes over a tag that matches no entry for the next tag" do
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :fr}} =
+               AcceptLanguage.best_match("de-CH,fr;q=0.8", supported: ["en", "fr"])
+    end
+
+    test "matches across a close language, as CLDR does" do
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :de}} =
+               AcceptLanguage.best_match("gsw", supported: ["en", "de"])
+    end
+
+    test "does not fall back to an entry in another language" do
+      assert {:error, %Localize.UnknownLocaleError{}} =
+               AcceptLanguage.best_match("de-CH", supported: ["en"])
+
+      assert {:error, %Localize.UnknownLocaleError{}} =
+               AcceptLanguage.best_match("und", supported: ["en", "fr"])
+    end
+
+    test "matches only the entries, not every configured locale" do
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :fr}} = AcceptLanguage.best_match("fr")
+
+      assert {:error, %Localize.UnknownLocaleError{}} =
+               AcceptLanguage.best_match("fr", supported: ["en", "de"])
+    end
+
+    test "matches the root locale only when the list holds it" do
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :und}} =
+               AcceptLanguage.best_match("und", supported: ["en", "und"])
+    end
+
+    test "takes atoms and tags as entries, and returns a tag entry as it stands" do
+      {:ok, german} = Localize.validate_locale("de")
+
+      assert {:ok, ^german} = AcceptLanguage.best_match("de-AT", supported: [:fr, german])
+
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :fr}} =
+               AcceptLanguage.best_match("fr-CA", supported: [:fr, german])
+    end
+
+    test "matches nothing against an empty list" do
+      assert {:error, %Localize.UnknownLocaleError{}} =
+               AcceptLanguage.best_match("en", supported: [])
+    end
+
+    test "matches against the configured locales when :supported is nil" do
+      assert AcceptLanguage.best_match("en-US,fr;q=0.8", supported: nil) ==
+               AcceptLanguage.best_match("en-US,fr;q=0.8")
+    end
+
+    test "returns an error for a :supported that is not a list" do
+      for supported <- ["en", :en, %{}, 1] do
+        assert {:error, %Localize.InvalidValueError{}} =
+                 AcceptLanguage.best_match("en", supported: supported)
+      end
+    end
+
+    test "returns an error for options that are not a list" do
+      for options <- [nil, "en", %{supported: ["en"]}] do
+        assert {:error, %Localize.InvalidValueError{}} = AcceptLanguage.best_match("en", options)
+      end
+    end
+
+    test "skips an entry that is not a locale" do
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :fr}} =
+               AcceptLanguage.best_match("fr", supported: ["!!!", "", nil, 1, "fr"])
     end
   end
 end
