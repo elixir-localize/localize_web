@@ -41,6 +41,8 @@ defmodule Localize.Plug.PutLocale do
 
     * `:path` will look for a locale by examining `conn.path_params`.
 
+    * `:path_prefix` will take the first segment of the path, `conn.path_info`, when it names a supported locale, ignoring case and taking `_` for `-`: `/fr/about` and `/zh-hant/about` name `fr` and `zh-Hant`. It is for addresses whose language prefix is optional, such as `/about` in the primary language beside `/fr/about`, which a `/:locale` scope cannot route, and for catch-all routes. The segment must name a supported locale exactly, so `/fr-ca/about` is not French where only `fr` is supported, and a page slug is never read as a language by closeness. The segment stays in the path for the router.
+
     * `:query` will look for a locale by examining `conn.query_params`.
 
     * `:body` will look for a locale by examining `conn.body_params`.
@@ -70,7 +72,7 @@ defmodule Localize.Plug.PutLocale do
 
   * `:param` is the name of the parameter to look for in the query, path, body, or cookie. The default is `"locale"`.
 
-  * `:supported` is the list of locales the request is matched against, for an application whose locales are known only at runtime, such as a site whose languages are kept in a database. Each entry is a locale identifier string or atom, or a `t:Localize.LanguageTag.t/0`, and should be a locale Localize is configured for, or its data falls back to another locale. It may also be a `{Module, function}` or `{Module, function, args}` tuple, whose function is called with the `conn` and the plug's options, followed by `args`, and returns the list: a function that returns anything else is logged, and no locale is taken from the request. The locale found is then the entry that matched, so `?locale=fr-CA` with `supported: ["en", "fr"]` sets `fr`, and every source is matched against the list but two, which are taken as they stand: the tag a localized route stores, and the locale a `{Module, function}` or `{Module, function, args}` source returns. Such a source finds the list in its options under `:supported`. The `:default` locale is not matched. The default is the locales configured for Localize.
+  * `:supported` is the list of locales the request is matched against, for an application whose locales are known only at runtime, such as a site whose languages are kept in a database. Each entry is a locale identifier string or atom, or a `t:Localize.LanguageTag.t/0`, and should be a locale Localize is configured for, or its data falls back to another locale. It may also be a `{Module, function}` or `{Module, function, args}` tuple, whose function is called with the `conn` and the plug's options, followed by `args`, and returns the list: a function that returns anything else is logged, and no locale is taken from the request. The locale found is then the entry that matched, so `?locale=fr-CA` with `supported: ["en", "fr"]` sets `fr`, and every source is matched against the list but two, which are taken as they stand (`:path_prefix` must name an entry exactly): the tag a localized route stores, and the locale a `{Module, function}` or `{Module, function, args}` source returns. Such a source finds the list in its options under `:supported`. The `:default` locale is not matched. The default is the locales configured for Localize.
 
   * `:vary` is `true` or `false`, and says whether the plug adds the `vary` header described above. The default is `true`. With `false` the plug adds none, and the application declares how its responses vary: for example where a cache inside the application keys on a request header the application derives from the session. A shared cache that is told nothing serves one visitor's language to another.
 
@@ -101,6 +103,7 @@ defmodule Localize.Plug.PutLocale do
   @from_options [
     :accept_language,
     :path,
+    :path_prefix,
     :body,
     :query,
     :session,
@@ -446,6 +449,13 @@ defmodule Localize.Plug.PutLocale do
     |> validate_locale_param(options[:supported])
   end
 
+  defp fetch_param(conn, :path_prefix, _param, options) do
+    conn
+    |> Map.get(:path_info)
+    |> List.first()
+    |> path_prefix_locale(options[:supported])
+  end
+
   defp fetch_param(conn, :body, param, options) do
     conn
     |> Map.get(:body_params)
@@ -486,6 +496,48 @@ defmodule Localize.Plug.PutLocale do
 
   defp fetch_param(conn, {module, function}, _param, options) do
     apply(module, function, [conn, options])
+  end
+
+  # A path prefix is part of the application's own addresses, so it is a hit
+  # only when it names a supported locale, ignoring case and `_` for `-`:
+  # `/fr-ca/about` is not read as French where only `fr` is supported, and a
+  # page slug is never taken for a language by closeness. A segment that
+  # names no supported locale reaches no Localize function.
+  defp path_prefix_locale(nil, _supported) do
+    nil
+  end
+
+  defp path_prefix_locale(segment, supported) do
+    entries = supported || Localize.supported_locales()
+    prefix = normalise_prefix(segment)
+
+    case Enum.find(entries, &(normalise_prefix(&1) == prefix)) do
+      nil -> nil
+      entry -> validate_locale_param(entry, supported)
+    end
+  end
+
+  defp normalise_prefix(%Localize.LanguageTag{} = locale) do
+    locale
+    |> Localize.LanguageTag.to_string()
+    |> normalise_prefix()
+  end
+
+  defp normalise_prefix(locale) when is_atom(locale) do
+    locale
+    |> Atom.to_string()
+    |> normalise_prefix()
+  end
+
+  defp normalise_prefix(locale) when is_binary(locale) do
+    locale
+    |> String.downcase()
+    |> String.replace("_", "-")
+  end
+
+  # An entry of any other shape, from a `:supported` function, names nothing.
+  defp normalise_prefix(_locale) do
+    nil
   end
 
   # A territory's locale is a hit only when it matches a supported locale,

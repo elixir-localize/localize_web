@@ -4,6 +4,16 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## Open
 
+* [ ] **A configurable session key** — `PutLocale`, `PutSession` and the LiveView helpers use the fixed key `"localize_locale"`, so an application cannot keep two languages, such as mishka_cms_core's public and admin languages.
+
+* [ ] **Sort locale names with CLDR collation** — `Localize.HTML.Locale`'s default collator compares display names with `<`, which mis-sorts accented and non-Latin names; `Localize.Collation.sort/2` is the right order.
+
+* [ ] **`lang` and `dir` for the document** — a helper giving `lang` and `dir` for a locale, and a LiveView element that updates `<html lang dir>` on a live navigation between languages, which a single live session otherwise leaves stale. Needs `Localize.Locale.direction/1`, in localize 1.10.
+
+* [ ] **A language switcher** — links built from the locale to URL map `Localize.HTML.Hreflang.links/2` takes, each name in its own language with `lang` and `dir`, and `aria-current` on the current one. Needs `Localize.Locale.direction/1`.
+
+* [ ] **A `content-language` response header** — `PutLocale` sets none for the locale it resolved. Low value: search engines mostly ignore it.
+
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
 
 ## Deferred
@@ -11,6 +21,8 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 * [ ] **Store only a chosen locale by default** — `Localize.Plug.PutSession` stores a locale from any source unless given `:from`, so an application gets the first-visit cookie until it opts out. Parked for 2.0: the new default breaks a LiveView in a live session that has not been given `Localize.Plug.live_session_locale/1`.
 
 ## Done
+
+* [x] **A language prefix on the path** — `PutLocale` takes a `:path_prefix` source, the first path segment when it names a supported locale exactly, for an optional prefix and catch-all routes (mishka_cms_core's `LanguagePlug` shape). 2026-11-25, unreleased (1.5.0).
 
 * [x] **Supported locales known only at runtime** — `PutLocale` and `Plug.AcceptLanguage` take `:supported` (a list or a function of the request) and `AcceptLanguage.best_match/2` a list; the host source is now matched too. 2026-11-24, unreleased (1.5.0).
 

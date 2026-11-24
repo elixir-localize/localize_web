@@ -121,6 +121,18 @@ end
 
 The URL, the session, the accept-language header and every other source but a localized route and a `{Module, function}` source are then matched against the list, and the locale found is the entry that matched: `accept-language: de-CH, en;q=0.5` with `["en", "fr"]` sets `en`, where matching against configured locales that include German would have set a `de-CH` tag. Each entry should be a locale Localize is configured for, since one that is not is formatted with another locale's data. `Localize.Plug.AcceptLanguage` takes the same option, and `Localize.AcceptLanguage.best_match/2` takes a list.
 
+### A language prefix on the path
+
+Many sites name the language in the first segment of the address, and leave it out for the primary language: `/about` in English and `/fr/about` in French. A `/:locale` scope cannot route the unprefixed addresses, and a CMS that answers every address with one catch-all route has no `:locale` parameter at all. The `:path_prefix` source reads the first segment of `conn.path_info` instead:
+
+```elixir
+plug Localize.Plug.PutLocale,
+  from: [:path_prefix, :session, :accept_language],
+  supported: {MyApp.Sites, :locales}
+```
+
+The segment is a hit only when it names a supported locale, ignoring case and taking `_` for `-`, so `/FR/about` and `/zh_hant/about` name `fr` and `zh-Hant`. Unlike an identifier in a query parameter, it is not matched by closeness: the prefix is part of the application's own addresses, so `/fr-ca/about` is not read as French where only `fr` is supported, and a page whose slug happens to resemble a language is never taken for one. The plug leaves the segment in the path, and `Localize.Plug.PutLocale.get_locale_source/1` returns `:path_prefix` when it decided, so the router or the application can strip it.
+
 ### The :param Option
 
 The `:param` option specifies the parameter name to look for in query, path, body, and cookie sources. The default is `"locale"`. For example, with `param: "lang"`, the plug will look for `?lang=fr` in query params or a `lang` path parameter.
@@ -273,6 +285,8 @@ Beyond the common sources shown above, `Localize.Plug.PutLocale` supports these 
 * `:body` — looks for the locale parameter in `conn.body_params`.
 
 * `:cookie` — looks for the locale parameter in the request cookies.
+
+* `:path_prefix` — takes the first segment of the path when it names a supported locale exactly. See [A language prefix on the path](#a-language-prefix-on-the-path).
 
 * `:host` — extracts the top-level domain from the hostname and resolves it to a locale. For example, `example.co.uk` resolves to a UK English locale. Generic TLDs like `.com`, `.org`, and `.net` are ignored.
 

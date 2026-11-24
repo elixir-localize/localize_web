@@ -1023,6 +1023,104 @@ defmodule Localize.Plug.PutLocaleTest do
     end
   end
 
+  describe "call/2 - set locale from the path prefix" do
+    def prefix_locales(%Plug.Conn{host: "example.de"}, _options) do
+      ["de", "en"]
+    end
+
+    def prefix_locales(%Plug.Conn{}, _options) do
+      [42, nil, "en", "fr"]
+    end
+
+    defp prefixed(path, options, headers \\ []) do
+      conn =
+        Enum.reduce(headers, conn(:get, path), fn {name, value}, conn ->
+          put_req_header(conn, name, value)
+        end)
+
+      PutLocale.call(conn, PutLocale.init(options))
+    end
+
+    test "takes a first segment that names a configured locale, in any case and either separator" do
+      for {path, locale_id} <- [
+            {"/fr/about", :fr},
+            {"/FR", :fr},
+            {"/zh-hant/blog/post", :"zh-Hant"},
+            {"/ZH_HANT", :"zh-Hant"},
+            {"/it-ch/", :"it-CH"}
+          ] do
+        conn = prefixed(path, from: [:path_prefix])
+
+        assert {path, PutLocale.get_locale(conn).cldr_locale_id} == {path, locale_id}
+        assert PutLocale.get_locale_source(conn) == :path_prefix
+      end
+    end
+
+    test "takes only a segment that names a supported locale, never the closest one" do
+      for path <- ["/fr-ca/about", "/de/about", "/fra/about", "/en-us"] do
+        conn =
+          prefixed(path, [from: [:path_prefix, :accept_language], supported: ["en", "fr"]], [
+            {"accept-language", "fr"}
+          ])
+
+        assert {path, PutLocale.get_locale_source(conn)} == {path, :accept_language}
+        assert PutLocale.get_locale(conn).cldr_locale_id == :fr
+      end
+    end
+
+    test "matches the supported list a function returns for the request" do
+      german =
+        prefixed("http://example.de/de/blog",
+          from: [:path_prefix],
+          supported: {__MODULE__, :prefix_locales}
+        )
+
+      other =
+        prefixed("http://example.com/de/blog",
+          from: [:path_prefix],
+          supported: {__MODULE__, :prefix_locales}
+        )
+
+      french =
+        prefixed("http://example.com/fr/blog",
+          from: [:path_prefix],
+          supported: {__MODULE__, :prefix_locales}
+        )
+
+      assert PutLocale.get_locale(german).cldr_locale_id == :de
+      assert PutLocale.get_locale_source(other) == :default
+      assert PutLocale.get_locale(french).cldr_locale_id == :fr
+    end
+
+    test "is a miss for a path with no locale segment, so the default decides" do
+      for path <- ["/", "/about", "/blog/fr", "/%E2%9C%93", "/" <> String.duplicate("x", 5000)] do
+        conn = prefixed(path, from: [:path_prefix], supported: ["en", "fr"])
+
+        assert {path, PutLocale.get_locale_source(conn)} == {path, :default}
+        assert PutLocale.get_locale(conn) == @default_locale
+      end
+    end
+
+    test "takes the root locale only when the list holds it" do
+      assert PutLocale.get_locale_source(
+               prefixed("/und/x", from: [:path_prefix], supported: ["en"])
+             ) ==
+               :default
+
+      assert PutLocale.get_locale(prefixed("/und/x", from: [:path_prefix])).cldr_locale_id == :und
+    end
+
+    test "adds no vary header, as the address names the language" do
+      conn = prefixed("/fr/about", from: [:path_prefix])
+
+      assert get_resp_header(conn, "vary") == []
+    end
+
+    test "is a source Localize.Plug.PutSession may store" do
+      assert Localize.Plug.PutSession.init(from: [:path_prefix])
+    end
+  end
+
   describe "call/2 - a host whose locale the application does not support" do
     test "is a miss, so the next source decides" do
       # Brazil's language, Portuguese, is not a configured locale.

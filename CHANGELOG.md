@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.AcceptLanguage.best_match/2` takes a `:supported` list and returns the entry that matched.
 
+* `Localize.Plug.PutLocale` takes a `:path_prefix` source: the first segment of the path, when it names a supported locale exactly. It serves addresses whose language prefix is optional, such as `/about` beside `/fr/about`, and catch-all routes.
+
 ### Fixed
 
 * `Localize.Plug.PutLocale` takes the locale of a host's territory only when it matches a supported locale, as it does for an identifier in the request. `example.br` where Portuguese is not supported resolved to a Portuguese tag carrying the first supported locale's data.
