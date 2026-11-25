@@ -48,7 +48,7 @@ defmodule Localize.HTML.Territory do
 
   * `:locale` defines the locale to be used to localise the description of the territories. The default is the locale returned by `Localize.get_locale/0`.
 
-  * `:collator` is a function used to sort the territories. The default collator sorts by name.
+  * `:collator` is a function used to sort the territories. The default sorts by name in the CLDR collation of the display locale, `:locale`.
 
   * `:mapper` is a function that creates the text to be displayed in the select tag for each territory. The default function is `&({&1.flag <> " " <> &1.name, &1.territory_code})`.
 
@@ -125,7 +125,7 @@ defmodule Localize.HTML.Territory do
     %{
       territories: Localize.Territory.individual_territories(),
       locale: Localize.get_locale(),
-      collator: &default_collator/1,
+      collator: :default,
       mapper: &{&1.flag <> " " <> &1.name, &1.territory_code},
       style: :standard,
       selected: nil
@@ -136,7 +136,7 @@ defmodule Localize.HTML.Territory do
     with {:ok, options} <- Options.merge(options, default_options()),
          {:ok, options} <- Options.locale(options),
          {:ok, options} <- Options.one_of(options, :style, Localize.Territory.known_styles()),
-         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.collator(options, & &1.name),
          {:ok, options} <- Options.function(options, :mapper),
          {:ok, options} <- Options.optional(options, :selected, &validate_territory/1) do
       Options.list(options, :territories, &validate_territory/1)
@@ -170,10 +170,6 @@ defmodule Localize.HTML.Territory do
     |> Enum.map(&territory_info(&1, options))
     |> collator.()
     |> Enum.map(&mapper.(&1))
-  end
-
-  defp default_collator(territories) do
-    Enum.sort(territories, &(&1.name < &2.name))
   end
 
   defp territory_info(territory, options) do

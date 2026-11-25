@@ -28,6 +28,51 @@ defmodule Localize.HTML.Options do
   end
 
   @doc false
+  # Resolves the `:collator` option once the display locale is resolved. The
+  # default, `:default`, sorts by the CLDR collation of that locale, reading
+  # each item's name with `name`; a caller's collator must be a function of
+  # arity 1.
+  def collator(%{collator: :default, locale: locale} = options, name) do
+    {:ok, Map.put(options, :collator, &collate(&1, name, locale))}
+  end
+
+  def collator(options, _name) do
+    function(options, :collator)
+  end
+
+  @doc false
+  # Sorts `items` by the CLDR collation of `locale`, reading each item's
+  # name with `name`, so that "Égypte" sorts beside "Égée" in French and
+  # Swedish sorts å after z. The collation options are resolved once for the
+  # list. The `:identity` display, each name in its own locale, is collated
+  # in the current locale. A name that has no sort key, or a locale that has
+  # no collation options, sorts by its UTF-8 bytes rather than failing.
+  def collate(items, name, :identity) do
+    collate(items, name, Localize.get_locale())
+  end
+
+  def collate(items, name, locale) do
+    case Localize.Collation.Options.from_locale(locale) do
+      %Localize.Collation.Options{} = options ->
+        Enum.sort_by(items, &collation_key(name.(&1), options))
+
+      {:error, _exception} ->
+        Enum.sort_by(items, name)
+    end
+  end
+
+  defp collation_key(name, options) when is_binary(name) do
+    case Localize.Collation.sort_key(name, options) do
+      key when is_binary(key) -> key
+      {:error, _exception} -> name
+    end
+  end
+
+  defp collation_key(_name, _options) do
+    <<>>
+  end
+
+  @doc false
   # Checks that the option is a function of arity 1.
   def function(options, key) do
     case Map.fetch!(options, key) do

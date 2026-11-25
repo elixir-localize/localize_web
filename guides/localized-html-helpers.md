@@ -36,7 +36,7 @@ iex> Localize.HTML.Territory.select(:my_form, :territory, selected: :AU)
 
 * `:prompt` — a prompt string displayed at the top of the select box.
 
-* `:collator` — a function to sort territories. The default sorts alphabetically by name. Receives a list of `%{territory_code: atom, name: string, flag: string}` maps and returns the sorted list.
+* `:collator` — a function to sort territories. The default sorts by name in the collation of the display locale, so "Ägypten" sorts beside "Albanien" in German. Receives a list of `%{territory_code: atom, name: string, flag: string}` maps and returns the sorted list.
 
 * `:mapper` — a function to produce the display text for each territory. The default is `&({&1.flag <> " " <> &1.name, &1.territory_code})`.
 
@@ -95,7 +95,7 @@ CLDR writes a subdivision code as its territory followed by the ISO 3166-2 code,
 
 * `:prompt` — a prompt string displayed at the top of the select box.
 
-* `:collator` — a function to sort subdivisions. The default sorts by localized name using `Localize.Collation`, so the order is correct for the locale. Receives a list of `%{subdivision_code: string, full_code: atom, name: string}` maps.
+* `:collator` — a function to sort subdivisions. The default sorts by localized name in the collation of the display locale. Receives a list of `%{subdivision_code: string, full_code: atom, name: string}` maps.
 
 * `:mapper` — a function to produce the display text for each subdivision. The default is `&({&1.name, &1.subdivision_code})`.
 
@@ -147,7 +147,7 @@ iex> Localize.HTML.Currency.select(:my_form, :currency, selected: :USD)
 
 * `:prompt` — a prompt string displayed at the top of the select box.
 
-* `:collator` — a function to sort currencies. The default sorts alphabetically by name.
+* `:collator` — a function to sort currencies. The default sorts by name in the collation of the display locale.
 
 * `:mapper` — a function to produce the display text for each currency. The default is `&({&1.code <> " - " <> &1.name, &1.code})`.
 
@@ -187,7 +187,7 @@ iex> Localize.HTML.Locale.select(:my_form, :locale, selected: "en")
 
 * `:prompt` — a prompt string displayed at the top of the select box.
 
-* `:collator` — a function to sort locales. The default sorts alphabetically by display name.
+* `:collator` — a function to sort locales. The default sorts by display name in the collation of the display locale, or of the current locale for `locale: :identity`.
 
 * `:mapper` — a function to produce the display text for each locale. Receives a map with `:display_name`, `:locale`, and `:language_tag` keys. The default is `&{&1.display_name, &1.locale}`.
 
@@ -243,7 +243,7 @@ iex> Localize.HTML.Unit.select(:my_form, :unit, selected: :kilogram)
 
 * `:prompt` — a prompt string displayed at the top of the select box.
 
-* `:collator` — a function to sort units. The default sorts alphabetically by display name.
+* `:collator` — a function to sort units. The default sorts by display name in the collation of the display locale.
 
 * `:mapper` — a function to produce the display text for each unit. Receives a `{display_name, unit_code}` tuple. The default is the identity function.
 
@@ -315,7 +315,7 @@ iex> Localize.HTML.Month.month_options(style: :abbreviated, locale: "de")
 
 ## Customizing Display with Mapper and Collator
 
-All select helpers accept `:mapper` and `:collator` options for full control over display text and sort order.
+All select helpers accept `:mapper` and `:collator` options for full control over display text and sort order. The default collators sort names with `Localize.Collation` in the locale they are displayed in, so accented and non-Latin names appear where a reader of that language expects them rather than in byte order, where every accented capital followed Z.
 
 ### Custom Mapper
 

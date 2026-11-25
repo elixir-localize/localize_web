@@ -35,7 +35,7 @@ defmodule Localize.HTML.Currency do
 
   * `:locale` defines the locale to be used to localise the description of the currencies. The default is the locale returned by `Localize.get_locale/0`.
 
-  * `:collator` is a function used to sort the currencies in the selection list. The default collator sorts by name.
+  * `:collator` is a function used to sort the currencies in the selection list. The default sorts by name in the CLDR collation of the display locale, `:locale`.
 
   * `:mapper` is a function that creates the text to be displayed in the select tag for each currency. The default function is `&({&1.code <> " - " <> &1.name, &1.code})`.
 
@@ -111,7 +111,7 @@ defmodule Localize.HTML.Currency do
   defp validate_options(options) do
     with {:ok, options} <- Options.merge(options, default_options()),
          {:ok, options} <- Options.locale(options),
-         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.collator(options, & &1.name),
          {:ok, options} <- Options.function(options, :mapper),
          {:ok, options} <- Options.optional(options, :selected, &validate_currency/1) do
       Options.list(options, :currencies, &validate_currency/1)
@@ -122,14 +122,10 @@ defmodule Localize.HTML.Currency do
     %{
       currencies: Localize.Currency.known_currency_codes(),
       locale: Localize.get_locale(),
-      collator: &default_collator/1,
+      collator: :default,
       mapper: &{to_string(&1.code) <> " - " <> to_string(&1.name), to_string(&1.code)},
       selected: nil
     }
-  end
-
-  defp default_collator(currencies) do
-    Enum.sort(currencies, &(&1.name < &2.name))
   end
 
   defp validate_currency(currency) do

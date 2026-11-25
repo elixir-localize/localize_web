@@ -4,8 +4,6 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## Open
 
-* [ ] **Sort locale names with CLDR collation** — `Localize.HTML.Locale`'s default collator compares display names with `<`, which mis-sorts accented and non-Latin names; `Localize.Collation.sort/2` is the right order.
-
 * [ ] **`lang` and `dir` for the document** — a helper giving `lang` and `dir` for a locale, and a LiveView element that updates `<html lang dir>` on a live navigation between languages, which a single live session otherwise leaves stale. Needs `Localize.Locale.direction/1`, in localize 1.10.
 
 * [ ] **A language switcher** — links built from the locale to URL map `Localize.HTML.Hreflang.links/2` takes, each name in its own language with `lang` and `dir`, and `aria-current` on the current one. Needs `Localize.Locale.direction/1`.
@@ -19,6 +17,8 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 * [ ] **Store only a chosen locale by default** — `Localize.Plug.PutSession` stores a locale from any source unless given `:from`, so an application gets the first-visit cookie until it opts out. Parked for 2.0: the new default breaks a LiveView in a live session that has not been given `Localize.Plug.live_session_locale/1`.
 
 ## Done
+
+* [x] **Sort names with CLDR collation** — the currency, territory, locale, unit and subdivision helpers sort by `Localize.Collation` in the display locale (`Localize.HTML.Options.collate/3`, options resolved once per list), where four sorted by bytes and subdivisions by root collation. 2026-11-25, unreleased (1.5.0).
 
 * [x] **A configurable session key** — `PutLocale` takes `:session_key`, which `PutSession`, `live_session_locale/1` and `get_session_key/1` follow; `put_locale_from_session/2` and `localize_live_session/3` take it too, so a site's pages and its admin keep two locales (mishka_cms_core's shape). 2026-11-25, unreleased (1.5.0).
 

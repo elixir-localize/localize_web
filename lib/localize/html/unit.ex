@@ -40,7 +40,7 @@ defmodule Localize.HTML.Unit do
 
   * `:locale` defines the locale to be used to localise the description of the units. The default is the locale returned by `Localize.get_locale/0`.
 
-  * `:collator` is a function used to sort the units. The default collator sorts by display name.
+  * `:collator` is a function used to sort the units. The default sorts by display name in the CLDR collation of the display locale, `:locale`.
 
   * `:mapper` is a function that creates the text to be displayed in the select tag for each unit. It receives a tuple `{display_name, unit_code}`. The default is the identity function.
 
@@ -112,7 +112,7 @@ defmodule Localize.HTML.Unit do
     with {:ok, options} <- Options.merge(options, default_options()),
          {:ok, options} <- Options.locale(options),
          {:ok, options} <- Options.one_of(options, :style, @styles),
-         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.collator(options, &elem(&1, 0)),
          {:ok, options} <- Options.function(options, :mapper),
          {:ok, options} <- Options.optional(options, :selected, &validate_unit/1) do
       Options.list(options, :units, &validate_unit/1)
@@ -123,15 +123,11 @@ defmodule Localize.HTML.Unit do
     %{
       units: default_unit_list(),
       locale: Localize.get_locale(),
-      collator: &default_collator/1,
+      collator: :default,
       mapper: & &1,
       style: :long,
       selected: nil
     }
-  end
-
-  defp default_collator(units) do
-    Enum.sort(units, fn {name_1, _}, {name_2, _} -> name_1 < name_2 end)
   end
 
   defp validate_unit(unit) when is_atom(unit) or is_binary(unit) do

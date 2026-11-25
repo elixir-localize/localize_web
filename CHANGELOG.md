@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Plug.PutLocale` takes a `:path_prefix` source: the first segment of the path, when it names a supported locale exactly. It serves addresses whose language prefix is optional, such as `/about` beside `/fr/about`, and catch-all routes.
 
+### Changed
+
+* The select helpers for currencies, territories, locales and units sort by `Localize.Collation` in the display locale, as subdivisions did with root collation; they sorted by UTF-8 bytes, which put "Ägypten" after "Simbabwe". Tailored locales such as `ja` and `zh` sort quickly from Localize 1.10.
+
 ### Fixed
 
 * `Localize.Plug.PutLocale` takes the locale of a host's territory only when it matches a supported locale, as it does for an identifier in the request. `example.br` where Portuguese is not supported resolved to a Portuguese tag carrying the first supported locale's data.

@@ -56,7 +56,7 @@ defmodule Localize.HTML.Locale do
 
   * `:locale` defines the locale used to localise the display names. The default is the locale returned by `Localize.get_locale/0`. If set to `:identity` then each locale in `:locales` will be rendered in its own locale.
 
-  * `:collator` is a function used to sort the locales. The default collator sorts by display name.
+  * `:collator` is a function used to sort the locales. The default sorts by display name in the CLDR collation of the display locale, `:locale`, or of the current locale for `:identity`.
 
   * `:mapper` is a function that creates the text to be displayed in the select tag for each locale. It receives a map with `:display_name`, `:locale` and `:language_tag` keys. The default mapper is `&{&1.display_name, &1.locale}`.
 
@@ -138,7 +138,7 @@ defmodule Localize.HTML.Locale do
   defp validate_options(options) do
     with {:ok, options} <- Options.merge(options, default_options()),
          {:ok, options} <- validate_display_locale(options),
-         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.collator(options, & &1.display_name),
          {:ok, options} <- Options.function(options, :mapper),
          {:ok, options} <- Options.optional(options, :selected, &validate_locale/1),
          {:ok, options} <- default_locales(options) do
@@ -150,17 +150,13 @@ defmodule Localize.HTML.Locale do
     %{
       locales: nil,
       locale: Localize.get_locale(),
-      collator: &default_collator/1,
+      collator: :default,
       mapper: &{&1.display_name, &1.locale},
       selected: nil,
       add_likely_subtags: false,
       compound_locale: false,
       prefer: :standard
     }
-  end
-
-  defp default_collator(locales) do
-    Enum.sort(locales, &(&1.display_name < &2.display_name))
   end
 
   # `:identity` renders each locale in itself; any other value is the

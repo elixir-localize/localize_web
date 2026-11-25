@@ -50,7 +50,7 @@ defmodule Localize.HTML.Subdivision do
 
   * `:selected` is the subdivision to mark as selected. Accepts either form of the code.
 
-  * `:collator` orders the subdivisions. The default sorts by localized name using `Localize.Collation.sort/2`, so the order is correct for the locale.
+  * `:collator` orders the subdivisions. The default sorts by localized name in the CLDR collation of the display locale, `:locale`.
 
   * `:mapper` builds each option from a `t:subdivision/0`. The default is `&{&1.name, &1.subdivision_code}`.
 
@@ -125,7 +125,7 @@ defmodule Localize.HTML.Subdivision do
     %{
       territory: nil,
       locale: Localize.get_locale(),
-      collator: &default_collator/1,
+      collator: :default,
       mapper: &{&1.name, &1.subdivision_code},
       full_codes: false,
       selected: nil
@@ -136,7 +136,7 @@ defmodule Localize.HTML.Subdivision do
     with {:ok, options} <- Options.merge(options, default_options()),
          {:ok, options} <- Options.locale(options),
          {:ok, options} <- Options.one_of(options, :full_codes, [true, false]),
-         {:ok, options} <- Options.function(options, :collator),
+         {:ok, options} <- Options.collator(options, & &1.name),
          {:ok, options} <- Options.function(options, :mapper),
          {:ok, options} <- Options.optional(options, :selected, &validate_selected/1) do
       validate_territory(options)
@@ -261,7 +261,4 @@ defmodule Localize.HTML.Subdivision do
 
   # Sorting by name has to be locale-aware: an alphabetical sort of French
   # names under an English collation puts accented names in the wrong place.
-  defp default_collator(subdivisions) do
-    Enum.sort_by(subdivisions, & &1.name, &(Localize.Collation.compare(&1, &2) != :gt))
-  end
 end
