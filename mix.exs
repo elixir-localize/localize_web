@@ -123,10 +123,7 @@ defmodule LocalizeWeb.MixProject do
 
   defp deps do
     [
-      # TEMPORARY: the local checkout until localize 1.10 is on hex, for
-      # `Localize.Locale.direction/1`. Then `{:localize, "~> 1.10"}`. Never
-      # release with this line.
-      {:localize, path: "../localize"},
+      {:localize, "~> 1.10"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},
