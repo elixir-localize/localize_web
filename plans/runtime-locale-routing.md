@@ -1,6 +1,6 @@
 # Runtime locale routing
 
-**Status:** draft, 2026-11-25
+**Status:** in progress, 2026-11-25
 
 A design for an optional locale prefix handled at runtime: `/about` in the default language beside `/fr/about`, with redirects between the forms, the same decision on a live navigation, and helpers to build the addresses. It serves two kinds of application: one with an ordinary router that wants every language without a copy of its routes per language, and one whose pages are data, such as a CMS answering every address with one catch-all route and choosing its languages per site. `mishka_cms_core` (`MishkaCmsCore.Runtime.Plugs.LanguagePlug`, at `a86940a`) is the second kind and the source of the requirements. Nothing here is built yet; the target is the release after 1.5.0.
 
@@ -82,9 +82,9 @@ Functions of a path with no `conn`, used by every layer:
 
 * **`path(path, locale, options)`** returns the address of `path` in `locale` under `:mode` and `:default`, adding, dropping or replacing the prefix: `path("/about", :fr, mode: :prefix_others, default: :en)` is `"/fr/about"`, and `path("/fr/about", :en, ...)` is `"/about"`.
 
-* **`target(path, locale, source, options)`** returns `:serve` or `{:redirect, path, 301 | 302}`, for the locale `Localize.Plug.PutLocale` resolved and the source it came from, under `:mode` and `:default`, with an optional `:exists?` test.
+* **`target(path, locale, options)`** returns `{:serve, locale}` or `{:redirect, path, 301 | 302}` under `:mode` and `:default`, with an optional `:exists?` test. The decision comes from the path: a prefixed path is served in the locale it names, or redirected with a `301` when that is the default under `:prefix_others`, and an unprefixed path is served in the default locale under `:prefix_others`, or redirected with a `302` to the visitor's `locale` under `:prefix_all`. The source of the visitor's locale is not needed for the decision, only for the `vary` of a `302`, which is the plug's. `:exists?` is called with the path without its prefix and the locale.
 
-A `~P` sigil or a `localized_path/2` helper composes a verified route with `path/3`, so `~p"/about"` is checked at compile time and given the current locale's prefix at runtime.
+A `~P` sigil or a `localized_path/2` helper composes a verified route with `path/3`, so `~p"/about"` is checked at compile time and given the current locale's prefix at runtime. It is built with the plug, which decides where the mode and default of a request are kept for it to read.
 
 ### `Localize.Plug.LocalePrefix` — on a request
 
@@ -191,7 +191,7 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ## Tasks
 
-* [ ] **`Localize.Routes.Prefix`** — `split/2`, `path/3` and `target/4`, with `:path_prefix` moved onto `split/2`, and `localized_path/2`.
+* [ ] **`Localize.Routes.Prefix`** — `split/2`, `path/3` and `target/3`, with `:path_prefix` moved onto `split/2`, have landed. `localized_path/2` waits on the plug, which decides where a request's mode and default are kept.
 
 * [ ] **`Localize.Routes.locale_prefix/2`** — the routes of a block declared plainly and under `/:locale`, with a compile-time error for a dynamic first segment.
 

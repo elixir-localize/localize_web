@@ -1093,7 +1093,15 @@ defmodule Localize.Plug.PutLocaleTest do
     end
 
     test "is a miss for a path with no locale segment, so the default decides" do
-      for path <- ["/", "/about", "/blog/fr", "/%E2%9C%93", "/" <> String.duplicate("x", 5000)] do
+      for path <- [
+            "/",
+            "/about",
+            "/blog/fr",
+            "/%E2%9C%93",
+            "/fr%3Fx/about",
+            "/fr%23x",
+            "/" <> String.duplicate("x", 5000)
+          ] do
         conn = prefixed(path, from: [:path_prefix], supported: ["en", "fr"])
 
         assert {path, PutLocale.get_locale_source(conn)} == {path, :default}

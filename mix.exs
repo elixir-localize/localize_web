@@ -86,6 +86,7 @@ defmodule LocalizeWeb.MixProject do
         ],
         Routes: [
           Localize.Routes,
+          Localize.Routes.Prefix,
           Localize.VerifiedRoutes,
           Localize.Routes.LocalizedHelpers
         ],

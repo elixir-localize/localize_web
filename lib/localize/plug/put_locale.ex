@@ -505,7 +505,6 @@ defmodule Localize.Plug.PutLocale do
   defp fetch_param(conn, :path_prefix, _param, options) do
     conn
     |> Map.get(:path_info)
-    |> List.first()
     |> path_prefix_locale(options[:supported])
   end
 
@@ -551,45 +550,22 @@ defmodule Localize.Plug.PutLocale do
     apply(module, function, [conn, options])
   end
 
-  # A path prefix is part of the application's own addresses, so it is a hit
-  # only when it names a supported locale, ignoring case and `_` for `-`:
-  # `/fr-ca/about` is not read as French where only `fr` is supported, and a
-  # page slug is never taken for a language by closeness. A segment that
-  # names no supported locale reaches no Localize function.
-  defp path_prefix_locale(nil, _supported) do
-    nil
-  end
-
-  defp path_prefix_locale(segment, supported) do
-    entries = supported || Localize.supported_locales()
-    prefix = normalise_prefix(segment)
-
-    case Enum.find(entries, &(normalise_prefix(&1) == prefix)) do
-      nil -> nil
-      entry -> validate_locale_param(entry, supported)
+  # A path prefix is read by `Localize.Routes.Prefix.split/2`, so the plug,
+  # the locale prefix plug and hook, and the addresses an application builds
+  # apply one rule: the segment must name a supported locale exactly. Only
+  # the first segment is passed, and it is a prefix only when nothing of it
+  # is left over, so a segment an adapter has decoded to hold `?` or `#` is
+  # never read as a prefix followed by a query string.
+  defp path_prefix_locale([segment | _rest], supported) do
+    case Localize.Routes.Prefix.split("/" <> segment, supported) do
+      {:ok, {nil, _path}} -> nil
+      {:ok, {locale, "/"}} -> {:ok, locale}
+      {:ok, {_locale, _not_one_segment}} -> nil
+      {:error, _exception} = error -> error
     end
   end
 
-  defp normalise_prefix(%Localize.LanguageTag{} = locale) do
-    locale
-    |> Localize.LanguageTag.to_string()
-    |> normalise_prefix()
-  end
-
-  defp normalise_prefix(locale) when is_atom(locale) do
-    locale
-    |> Atom.to_string()
-    |> normalise_prefix()
-  end
-
-  defp normalise_prefix(locale) when is_binary(locale) do
-    locale
-    |> String.downcase()
-    |> String.replace("_", "-")
-  end
-
-  # An entry of any other shape, from a `:supported` function, names nothing.
-  defp normalise_prefix(_locale) do
+  defp path_prefix_locale(_path_info, _supported) do
     nil
   end
 

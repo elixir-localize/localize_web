@@ -212,9 +212,18 @@ defmodule Localize.AcceptLanguage do
   end
 
   def supported_match(tag, supported) when is_list(supported) do
-    with {:ok, requested} <- Localize.validate_locale(tag),
-         {:ok, entry} <- closest_supported(requested, supported) do
+    with {:ok, entry} <- supported_entry(tag, supported) do
       served_locale(entry)
+    end
+  end
+
+  # The entry of `supported`, as given, that a tag matches, for a caller that
+  # needs the entry itself, such as `Localize.Routes.Prefix`, which writes an
+  # entry as a path prefix.
+  @doc false
+  def supported_entry(tag, supported) when is_list(supported) do
+    with {:ok, requested} <- Localize.validate_locale(tag) do
+      closest_supported(requested, supported)
     end
   end
 
