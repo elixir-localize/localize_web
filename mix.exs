@@ -99,6 +99,7 @@ defmodule LocalizeWeb.MixProject do
           Localize.HTML.Month,
           Localize.HTML.Message,
           Localize.HTML.Hreflang,
+          Localize.HTML.Document,
           Localize.RelativeUrlError
         ]
       ],
@@ -114,7 +115,10 @@ defmodule LocalizeWeb.MixProject do
 
   defp deps do
     [
-      {:localize, "~> 1.4"},
+      # TEMPORARY: the local checkout until localize 1.10 is on hex, for
+      # `Localize.Locale.direction/1`. Then `{:localize, "~> 1.10"}`. Never
+      # release with this line.
+      {:localize, path: "../localize"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:plug, "~> 1.9"},
       {:gettext, "~> 1.0"},

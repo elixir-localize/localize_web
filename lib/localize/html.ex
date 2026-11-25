@@ -20,6 +20,8 @@ defmodule Localize.HTML do
 
   * `message/1` — renders an MF2 message with inline markup, see `Localize.HTML.Message`.
 
+  * The `lang` and `dir` of a page's `<html>` element, kept current across live navigation — see `Localize.HTML.Document`.
+
   * `t/1`, `t/2` — compile-time MF2 translation macro for HEEx templates.
     Combines Gettext lookup with MF2 interpolation and markup rendering
     in one call: `{t("Hello, \#{@user.name}!")}`.

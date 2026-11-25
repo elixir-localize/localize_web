@@ -432,6 +432,25 @@ end
 
 `localize_live_session/3` already passes the locale of a localized route this way, so only live sessions that are not localized need it.
 
+### The document's language and direction
+
+Every page carries its locale on `<html>`: `lang`, which a screen reader chooses its voice from, and `dir`, which is `rtl` for Arabic, Persian, Hebrew or Urdu. `Localize.HTML.Document.html/1` renders the element of a root layout with both, taking the direction from CLDR's script data, so no list of right-to-left languages needs to be kept:
+
+```heex
+<Localize.HTML.Document.html locale={@locale} class="h-full">
+  <head>...</head>
+  <body>{@inner_content}</body>
+</Localize.HTML.Document.html>
+```
+
+A root layout is rendered once per HTTP request. A live session whose pages change locale, such as one catch-all route that serves every language, keeps the first page's `lang` and `dir` through a live navigation to a page in another language. `Localize.HTML.Document.live_locale/1`, placed in the live view's layout, sets both on `<html>` whenever such a page mounts:
+
+```heex
+<Localize.HTML.Document.live_locale locale={@locale} />
+```
+
+Localized routes made by `Localize.Routes.localize_live_session/3` need neither the element nor a hook, since a navigation to another locale there is a full page load. `Localize.HTML.Document.attributes/1` returns `{:ok, [lang: "fa", dir: "rtl"]}` for a template of your own.
+
 ## Accessing the Locale in Controllers and Views
 
 After the plug pipeline runs, the locale is available in several ways:

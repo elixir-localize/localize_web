@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.AcceptLanguage.best_match/2` takes a `:supported` list and returns the entry that matched.
 
+* `Localize.HTML.Document` gives a page's `lang` and `dir` for its locale, from CLDR script data: `attributes/1`, an `html/1` component for the root layout, and `live_locale/1`, which updates `<html lang dir>` on a live navigation to another locale. Requires `localize ~> 1.10`.
+
 * `Localize.Plug.PutLocale` takes a `:session_key` option, which `Localize.Plug.PutSession`, `Localize.Plug.live_session_locale/1` and `Localize.Plug.PutLocale.get_session_key/1` follow, so two pipelines keep two locales apart. `Localize.Plug.put_locale_from_session/2` and `Localize.Routes.localize_live_session/3` take the same option.
 
 * `Localize.Plug.PutLocale` takes a `:path_prefix` source: the first segment of the path, when it names a supported locale exactly. It serves addresses whose language prefix is optional, such as `/about` beside `/fr/about`, and catch-all routes.
