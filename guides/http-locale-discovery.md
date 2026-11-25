@@ -123,7 +123,7 @@ The URL, the session, the accept-language header and every other source but a lo
 
 ### A language prefix on the path
 
-Many sites name the language in the first segment of the address, and leave it out for the primary language: `/about` in English and `/fr/about` in French. A `/:locale` scope cannot route the unprefixed addresses, and a CMS that answers every address with one catch-all route has no `:locale` parameter at all. The `:path_prefix` source reads the first segment of `conn.path_info` instead:
+Many sites name the language in the first segment of the address, and leave it out for the primary language: `/about` in English and `/fr/about` in French. A `/:locale` scope alone cannot route the unprefixed addresses, and a CMS that answers every address with one catch-all route has no `:locale` parameter at all. The `:path_prefix` source reads the first segment of `conn.path_info` instead:
 
 ```elixir
 plug Localize.Plug.PutLocale,
@@ -131,7 +131,7 @@ plug Localize.Plug.PutLocale,
   supported: {MyApp.Sites, :locales}
 ```
 
-The segment is a hit only when it names a supported locale, ignoring case and taking `_` for `-`, so `/FR/about` and `/zh_hant/about` name `fr` and `zh-Hant`. Unlike an identifier in a query parameter, it is not matched by closeness: the prefix is part of the application's own addresses, so `/fr-ca/about` is not read as French where only `fr` is supported, and a page whose slug happens to resemble a language is never taken for one. The plug leaves the segment in the path, and `Localize.Plug.PutLocale.get_locale_source/1` returns `:path_prefix` when it decided, so the router or the application can strip it.
+The segment is a hit only when it names a supported locale, ignoring case and taking `_` for `-`, so `/FR/about` and `/zh_hant/about` name `fr` and `zh-Hant`. Unlike an identifier in a query parameter, it is not matched by closeness: the prefix is part of the application's own addresses, so `/fr-ca/about` is not read as French where only `fr` is supported, and a page whose slug happens to resemble a language is never taken for one. The plug leaves the segment in the path, where the router matches it, and `Localize.Plug.PutLocale.get_locale_source/1` returns `:path_prefix` when it decided. Redirecting the default locale's prefix, routing both forms of an address from one router block, live navigation and building addresses in each language are covered in the [runtime locale routing guide](runtime-locale-routing.md).
 
 ### The :param Option
 

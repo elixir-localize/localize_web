@@ -1,6 +1,6 @@
 # Runtime locale routing
 
-**Status:** in progress, 2026-11-25
+**Status:** implemented (v1.5.0), 2026-11-25
 
 A design for an optional locale prefix handled at runtime: `/about` in the default language beside `/fr/about`, with redirects between the forms, the same decision on a live navigation, and helpers to build the addresses. It serves two kinds of application: one with an ordinary router that wants every language without a copy of its routes per language, and one whose pages are data, such as a CMS answering every address with one catch-all route and choosing its languages per site. `mishka_cms_core` (`MishkaCmsCore.Runtime.Plugs.LanguagePlug`, at `a86940a`) is the second kind and the source of the requirements. Nothing here is built yet; the target is the release after 1.5.0.
 
@@ -187,9 +187,9 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ## Tasks
 
-* [ ] **A guide** — runtime locale routing beside `Localize.Routes`: when each fits, an ordinary router with `locale_prefix`, and a CMS with a catch-all route, sites, modes, alternates and a switcher built with `Localize.Routes.Prefix.path/3`.
-
 ### Done
+
+* [x] **A guide** — `guides/runtime-locale-routing.md`: translated routes against runtime prefixes, the URL modes, an ordinary router with `locale_prefix`, a CMS with a catch-all route, live navigation, addresses, switchers and caching; its `iex>` examples run as doctests in `test/guides_test.exs`. It led to `Localize.Live.LocalePrefix.get_settings/1`, which a catch-all LiveView needs to split its path. 2026-11-25.
 
 * [x] **`Localize.Live.LocalePrefix`** — the `on_mount` and `handle_params` hook with `session/1`, `Localize.Routes.Request` for the plug's and the hook's functions, and the parity test through a router, an endpoint and a LiveView in both modes. 2026-11-25.
 

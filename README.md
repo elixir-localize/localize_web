@@ -18,6 +18,8 @@ Phoenix integration for the [Localize](https://hex.pm/packages/localize) library
 
 * **[Verified Localized Routes](https://hexdocs.pm/localize_web/phoenix-localized-routing.html#verified-localized-routes-with-q)** — the `~q` sigil provides compile-time verified localized routes that dispatch to the correct translated path based on the current locale.
 
+* **[Runtime Locale Prefixes](https://hexdocs.pm/localize_web/runtime-locale-routing.html)** — serve `/about` and `/fr/about` with the locale decided at runtime: two URL modes with their redirects, one router block for both forms of an address, the same rules on live navigation, and addresses for links and language switchers.
+
 * **[Document Language and Direction](https://hexdocs.pm/localize_web/http-locale-discovery.html#the-document-s-language-and-direction)** — render `<html lang dir>` for the page's locale, right to left for Arabic or Persian from CLDR script data, and keep it current across live navigation.
 
 * **[Language Switcher](https://hexdocs.pm/localize_web/localized-html-helpers.html#language-switcher)** — links to the page in each of its languages, each named in itself and cased for a menu, with `lang`, `dir` and `aria-current`, from the same map of locale to URL as the hreflang annotations.

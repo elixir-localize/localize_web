@@ -64,6 +64,7 @@ defmodule LocalizeWeb.MixProject do
         "CHANGELOG.md",
         "guides/http-locale-discovery.md",
         "guides/phoenix-localized-routing.md",
+        "guides/runtime-locale-routing.md",
         "guides/localized-html-helpers.md",
         "guides/mf2-messages-in-heex.md"
       ],
@@ -71,6 +72,7 @@ defmodule LocalizeWeb.MixProject do
         Guides: [
           "guides/http-locale-discovery.md",
           "guides/phoenix-localized-routing.md",
+          "guides/runtime-locale-routing.md",
           "guides/localized-html-helpers.md",
           "guides/mf2-messages-in-heex.md"
         ]

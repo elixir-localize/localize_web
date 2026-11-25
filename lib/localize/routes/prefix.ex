@@ -12,6 +12,8 @@ defmodule Localize.Routes.Prefix do
 
   * `localized_path/3` gives a path's address in the current locale, or another, by the settings `Localize.Plug.LocalePrefix` resolved for the request, for links in templates: `localized_path(@conn, ~p"/about")`.
 
+  The [runtime locale routing guide](runtime-locale-routing.md) shows these functions with the plug, the router macro and the live hook, for an ordinary router and for a CMS.
+
   ### Prefixes
 
   A first segment is a prefix only when it names a supported locale exactly, ignoring case and taking `_` for `-`: `/fr/about` and `/zh-hant/about` name `fr` and `zh-Hant`, while `/fr-ca/about` is not French where only `fr` is supported, and a page slug is never read as a language by closeness. A prefix is written as the supported locale it names, in lower case: `zh-Hant` is written `/zh-hant`.

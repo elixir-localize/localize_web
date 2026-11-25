@@ -93,6 +93,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     @doc """
+    Returns the settings the hook put on a socket.
+
+    A LiveView that answers a catch-all route reads the supported locales here to take the prefix off the path it is given, with `Localize.Routes.Prefix.split/2`.
+
+    ### Arguments
+
+    * `socket` is a LiveView socket.
+
+    ### Returns
+
+    * A map with `:mode`, `:default`, `:supported` and `:param`, as `Localize.Plug.LocalePrefix` resolved them for the page, or
+
+    * `nil` when the hook has not run on `socket`.
+
+    ### Examples
+
+        iex> Localize.Live.LocalePrefix.get_settings(%Phoenix.LiveView.Socket{})
+        nil
+
+    """
+    @spec get_settings(term()) :: map() | nil
+    def get_settings(%Phoenix.LiveView.Socket{private: private}) do
+      Map.get(private, @private_key)
+    end
+
+    def get_settings(_socket) do
+      nil
+    end
+
+    @doc """
     Sets the locale from the session and attaches the `handle_params` hook.
 
     ### Arguments

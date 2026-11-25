@@ -25,7 +25,8 @@ defmodule Localize.LiveLocalePrefixTest.PageLive do
        uri: uri,
        locale: Localize.get_locale().cldr_locale_id,
        gettext: Gettext.get_locale(MyApp.Gettext),
-       contact: Localize.Routes.Prefix.localized_path(socket, "/contact")
+       contact: Localize.Routes.Prefix.localized_path(socket, "/contact"),
+       supported: Enum.join(Localize.Live.LocalePrefix.get_settings(socket).supported, " ")
      )}
   end
 
@@ -38,6 +39,7 @@ defmodule Localize.LiveLocalePrefixTest.PageLive do
     <p id="locale">{@locale}</p>
     <p id="gettext">{@gettext}</p>
     <p id="contact">{@contact}</p>
+    <p id="supported">{@supported}</p>
     <p id="uri">{@uri}</p>
     """
   end
@@ -131,6 +133,7 @@ defmodule Localize.LiveLocalePrefixTest do
       assert text(html, "locale") == "fr"
       assert text(html, "gettext") == "fr"
       assert text(html, "contact") == "/fr/contact"
+      assert text(html, "supported") == "en fr de"
     end
 
     test "serves an unprefixed address in the default locale under :prefix_others" do

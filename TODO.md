@@ -6,15 +6,13 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
 
-## In progress
-
-* [ ] **Runtime locale routing** — an optional locale prefix handled at runtime: the two URL modes with their redirects, routes declared plainly and under `/:locale` from one block, the same rules on live navigation, and address helpers; for ordinary routers and for CMS-style catch-all routing (mishka_cms_core's shape). `Localize.Routes.Prefix` (`split/2`, `path/3`, `target/3`), the `locale_prefix/2` router macro, `Localize.Plug.LocalePrefix` and `Localize.Live.LocalePrefix` have landed; the guide remains. Design in [plans/runtime-locale-routing.md](plans/runtime-locale-routing.md).
-
 ## Deferred
 
 * [ ] **Store only a chosen locale by default** — `Localize.Plug.PutSession` stores a locale from any source unless given `:from`, so an application gets the first-visit cookie until it opts out. Parked for 2.0: the new default breaks a LiveView in a live session that has not been given `Localize.Plug.live_session_locale/1`.
 
 ## Done
+
+* [x] **Runtime locale routing** — `Localize.Routes.Prefix`, `Localize.Routes.locale_prefix/2`, `Localize.Plug.LocalePrefix`, `Localize.Live.LocalePrefix` and the runtime locale routing guide; design in [plans/runtime-locale-routing.md](plans/runtime-locale-routing.md). 2026-11-25.
 
 * [x] **A `content-language` response header** — `PutLocale` takes `content_language: true`, which names the canonical tag of the locale it set; off by default. 2026-11-25, unreleased (1.5.0).
 
