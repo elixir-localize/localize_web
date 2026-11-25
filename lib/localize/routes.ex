@@ -461,9 +461,9 @@ defmodule Localize.Routes do
 
   The block's routes are declared as written and again in a `scope "/:locale"`, so `/about` and `/fr/about` are both routes, with `"fr"` in the `"locale"` path parameter. Placed inside a `Phoenix.LiveView.Router.live_session/3`, both copies are in one live session, so a LiveView connects to either address, patches within it, and navigates live to the same page in another language. The locale is a parameter rather than a route of its own, so a language added at runtime needs no new route, and `~p"/about"` and `~p"/\#{locale}/about"` are both verified.
 
-  A router that does not `use Localize.Routes` imports the macro:
+  A router that does not `use Localize.Routes` imports the macro, adding `locale_prefix: 2` when it passes options:
 
-      import Localize.Routes, only: [locale_prefix: 1, locale_prefix: 2]
+      import Localize.Routes, only: [locale_prefix: 1]
 
   The router decides nothing about the locale. `Localize.Plug.PutLocale` with the `:path` source, or `:path_prefix`, reads it; `Localize.Routes.Prefix.target/3` decides whether `/en/about` is redirected to `/about`; and the parameter can capture a segment that is not a locale, such as `blog` in `/blog/about`, which the application should answer with a `404`.
 
@@ -487,7 +487,7 @@ defmodule Localize.Routes do
 
   A path that is not a literal string, such as a module attribute, is not checked.
 
-  The prefixed copies match more than the addresses they were written for, since a segment that is not a locale is still a value of the parameter. Verified routes are checked against them too, so with `/` in the block, its copy `/:locale` matches any path of one segment, and a mistyped `~p"/abuot"` is not reported. And they match addresses meant for routes declared after the block: with `/about` in the block, `/:locale/about` matches `/help/about` before a later `get "/help/about"` is reached. Declare `locale_prefix/2` blocks after the routes they could match.
+  The prefixed copies match more than the addresses they were written for, since a segment that is not a locale is still a value of the parameter. Verified routes are checked against them too, so with `/` in the block, its copy `/:locale` matches any path of one segment, and a mistyped `~p"/abuot"` is not reported. And they match addresses meant for routes declared after the block: with `/about` in the block, `/:locale/about` matches `/help/about` before a later `get "/help/about"` is reached. Each such later route is reported with a compile-time warning naming the copy that matches first and a path both match; declare it before the block, or give it a path the copies cannot match.
 
   ### Examples
 
@@ -504,16 +504,220 @@ defmodule Localize.Routes do
   defmacro locale_prefix(options \\ [], do: block) do
     param = locale_prefix_param!(options)
     check_locale_prefix_route!(block)
+    register_shadowing_check(__CALLER__.module)
 
     quote location: :keep do
       require Phoenix.Router
 
       unquote(block)
 
+      route_count = Localize.Routes.__route_count__(__MODULE__)
+
       Phoenix.Router.scope unquote("/:" <> param) do
         unquote(block)
       end
+
+      @localize_locale_prefix_copies Localize.Routes.__routes_since__(__MODULE__, route_count)
     end
+  end
+
+  # The prefixed copies of each block are recorded, and once the router's
+  # routes are all declared they are compared with the routes after them.
+  defp register_shadowing_check(module) do
+    if not Module.has_attribute?(module, :localize_locale_prefix_copies) do
+      Module.register_attribute(module, :localize_locale_prefix_copies, accumulate: true)
+
+      Module.put_attribute(
+        module,
+        :before_compile,
+        {Localize.Routes, :__check_locale_prefix_shadowing__}
+      )
+    end
+  end
+
+  @doc false
+  def __route_count__(module) do
+    module
+    |> Module.get_attribute(:phoenix_routes, [])
+    |> length()
+  end
+
+  # `@phoenix_routes` accumulates, newest first.
+  @doc false
+  def __routes_since__(module, count) do
+    routes = Module.get_attribute(module, :phoenix_routes, [])
+    Enum.take(routes, length(routes) - count)
+  end
+
+  @doc false
+  # Warns of each route declared after a `locale_prefix/2` block that a
+  # prefixed copy matches some of the requests for: Phoenix answers with the
+  # first route that matches, so those requests never reach it. A route that
+  # is itself a prefixed copy is not reported, since its overlap with an
+  # earlier copy is the same as that of the routes they copy, which is the
+  # application's own ordering.
+  defmacro __check_locale_prefix_shadowing__(env) do
+    copies =
+      env.module
+      |> Module.get_attribute(:localize_locale_prefix_copies, [])
+      |> List.flatten()
+      |> MapSet.new(&route_key/1)
+
+    env.module
+    |> Module.get_attribute(:phoenix_routes, [])
+    |> Enum.reverse()
+    |> shadowed_routes(copies)
+    |> Enum.each(fn {route, copy} ->
+      IO.warn(shadowing_warning(route, copy), %{env | line: route.line})
+    end)
+
+    nil
+  end
+
+  defp shadowed_routes(routes, copies) do
+    {_copies_seen, shadowed} =
+      Enum.reduce(routes, {[], []}, fn route, {seen, shadowed} ->
+        shadow_step(route, MapSet.member?(copies, route_key(route)), seen, shadowed)
+      end)
+
+    Enum.reverse(shadowed)
+  end
+
+  # A route is known by where and how it was declared, so the check does not
+  # depend on whether another `@before_compile` hook rewrote its private
+  # data first.
+  defp route_key(route) do
+    {route.verb, route.path, route.kind, route.hosts, route.line}
+  end
+
+  defp shadow_step(route, true = _copy?, seen, shadowed) do
+    {[route | seen], shadowed}
+  end
+
+  defp shadow_step(route, false = _copy?, seen, shadowed) do
+    case Enum.find(Enum.reverse(seen), &shadows?(&1, route)) do
+      nil -> {seen, shadowed}
+      copy -> {seen, [{route, copy} | shadowed]}
+    end
+  end
+
+  defp shadows?(copy, route) do
+    same_verb?(copy.verb, route.verb) and same_host?(copy.hosts, route.hosts) and
+      overlap?(segments(copy), segments(route))
+  end
+
+  defp same_verb?(verb, verb) do
+    true
+  end
+
+  defp same_verb?(copy_verb, route_verb) do
+    copy_verb == :* or route_verb == :*
+  end
+
+  defp same_host?([], _hosts) do
+    true
+  end
+
+  defp same_host?(_hosts, []) do
+    true
+  end
+
+  defp same_host?(copy_hosts, route_hosts) do
+    Enum.any?(copy_hosts, &(&1 in route_hosts))
+  end
+
+  # A forward answers every path below its own.
+  defp segments(%{kind: :forward, path: path}) do
+    String.split(path, "/", trim: true) ++ ["*forward"]
+  end
+
+  defp segments(%{path: path}) do
+    String.split(path, "/", trim: true)
+  end
+
+  # Whether some path is matched by both lists of segments.
+  defp overlap?([], []) do
+    true
+  end
+
+  defp overlap?(["*" <> _glob | _rest], _segments) do
+    true
+  end
+
+  defp overlap?(_segments, ["*" <> _glob | _rest]) do
+    true
+  end
+
+  defp overlap?([":" <> _param | copy_rest], [_segment | route_rest]) do
+    overlap?(copy_rest, route_rest)
+  end
+
+  defp overlap?([_segment | copy_rest], [":" <> _param | route_rest]) do
+    overlap?(copy_rest, route_rest)
+  end
+
+  defp overlap?([segment | copy_rest], [segment | route_rest]) do
+    overlap?(copy_rest, route_rest)
+  end
+
+  defp overlap?(_copy_segments, _route_segments) do
+    false
+  end
+
+  defp shadowing_warning(route, copy) do
+    example = example_path(segments(copy), segments(route))
+
+    "#{route_label(route)} is not reached for some requests: #{route_label(copy)}, " <>
+      "declared before it by locale_prefix/2, matches them first, such as #{example}. " <>
+      "Declare it before the locale_prefix block, or give it a path the prefixed routes cannot match."
+  end
+
+  defp route_label(%{kind: :forward, path: path}) do
+    "forward #{path}"
+  end
+
+  defp route_label(%{verb: verb, path: path}) do
+    "#{verb} #{path}"
+  end
+
+  # A path both routes match, with a literal segment where either has one.
+  defp example_path(copy_segments, route_segments) do
+    copy_segments
+    |> example_segments(route_segments, [])
+    |> Enum.reverse()
+    |> then(&("/" <> Enum.join(&1, "/")))
+  end
+
+  defp example_segments([], [], acc) do
+    acc
+  end
+
+  defp example_segments(["*" <> _glob | _rest], _route_segments, acc) do
+    acc
+  end
+
+  defp example_segments(_copy_segments, ["*" <> _glob | _rest], acc) do
+    acc
+  end
+
+  defp example_segments([copy_segment | copy_rest], [route_segment | route_rest], acc) do
+    example_segments(copy_rest, route_rest, [example_segment(copy_segment, route_segment) | acc])
+  end
+
+  defp example_segments(_copy_segments, _route_segments, acc) do
+    acc
+  end
+
+  defp example_segment(":" <> _param, ":" <> _other) do
+    "x"
+  end
+
+  defp example_segment(":" <> _param, segment) do
+    segment
+  end
+
+  defp example_segment(segment, _route_segment) do
+    segment
   end
 
   defp locale_prefix_param!(options) do

@@ -199,6 +199,6 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ### Done
 
-* [x] **`Localize.Routes.locale_prefix/2`** — declares a block plainly and under `/:param`; refuses a dynamic first segment, `forward`, `live_session` and nested blocks at compile time. Verified routes accept any one-segment path once `/` is in the block, and the prefixed copies can match routes declared after the block; both documented. 2026-11-25.
+* [x] **`Localize.Routes.locale_prefix/2`** — declares a block plainly and under `/:param`; refuses a dynamic first segment, `forward`, `live_session` and nested blocks at compile time. A later route a prefixed copy matches first is warned of at compile time. Verified routes accept any one-segment path once `/` is in the block, which is documented. 2026-11-25.
 
 * [x] **Try stripping the prefix with LiveView** — it does not work: LiveView refuses to connect to a stripped address and `push_patch` raises; declaring the routes under `/:locale` works. 2026-11-25.

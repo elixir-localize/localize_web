@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Routes.Prefix` holds the rules of a locale prefix as functions of a path: `split/2` reads it, `path/3` builds a path's address in a locale, and `target/3` decides whether a request is served or redirected. Both take a `:prefix_others` or `:prefix_all` URL mode.
 
-* `Localize.Routes.locale_prefix/2` declares a block's routes as written and under `/:locale`, so a LiveView connects, patches and navigates live between `/about` and `/fr/about`. A route with a dynamic first segment is refused at compile time.
+* `Localize.Routes.locale_prefix/2` declares a block's routes as written and under `/:locale`, so a LiveView connects, patches and navigates live between `/about` and `/fr/about`. A route with a dynamic first segment is refused, and a later route the copies would shadow is warned of, at compile time.
 
 ### Changed
 

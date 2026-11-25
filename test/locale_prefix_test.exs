@@ -28,7 +28,7 @@ end
 defmodule Localize.LocalePrefixTest.Router do
   use Phoenix.Router
   import Phoenix.LiveView.Router
-  import Localize.Routes, only: [locale_prefix: 1, locale_prefix: 2]
+  import Localize.Routes, only: [locale_prefix: 1]
 
   alias Localize.LocalePrefixTest.PageLive
 
@@ -275,6 +275,127 @@ defmodule Localize.LocalePrefixTest do
           compile_router(~s|get "/x", PageController, :show|, options)
         end
       end
+    end
+  end
+
+  describe "shadowing warnings" do
+    defp router_warnings(body) do
+      name = "Localize.LocalePrefixTest.Shadow#{System.unique_integer([:positive])}"
+
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        Code.compile_string("""
+        defmodule #{name} do
+          use Phoenix.Router
+          import Localize.Routes, only: [locale_prefix: 1, locale_prefix: 2], warn: false
+
+          #{body}
+        end
+        """)
+      end)
+    end
+
+    test "warns of a route after the block that a prefixed copy matches first" do
+      warnings =
+        router_warnings("""
+        locale_prefix do
+          get "/about", PageController, :about
+        end
+
+        get "/help/about", PageController, :help
+        """)
+
+      assert warnings =~ "get /help/about is not reached for some requests"
+      assert warnings =~ "get /:locale/about, declared before it by locale_prefix/2"
+      assert warnings =~ "such as /help/about"
+    end
+
+    test "warns of a one-segment route after a block holding the root" do
+      warnings =
+        router_warnings("""
+        locale_prefix do
+          get "/", PageController, :home
+        end
+
+        get "/help", PageController, :help
+        """)
+
+      assert warnings =~ "get /help is not reached for some requests: get /:locale"
+    end
+
+    test "warns of partial overlaps: parameters, globs, forwards, any verb and a later block" do
+      for {later, example} <- [
+            {~s|get "/help/:topic", PageController, :help|, "/help/about"},
+            {~s|get "/:section/about", PageController, :help|, "/x/about"},
+            {~s|get "/files/*path", PageController, :help|, "/files"},
+            {~s|forward "/api", PageController|, "/api"},
+            {~s|match :*, "/help/about", PageController, :help|, "/help/about"},
+            {~s|scope "/", host: "api." do get "/help/about", PageController, :help end|,
+             "/help/about"},
+            {~s|locale_prefix do get "/help/about", PageController, :help end|, "/help/about"}
+          ] do
+        warnings =
+          router_warnings("""
+          locale_prefix do
+            get "/about", PageController, :about
+          end
+
+          #{later}
+          """)
+
+        assert warnings =~ "is not reached for some requests", later
+        assert warnings =~ "such as #{example}", later
+      end
+    end
+
+    test "does not warn of a route the prefixed copies cannot match, or one declared first" do
+      for {before, later} <- [
+            {"", ~s|post "/help/about", PageController, :help|},
+            {"", ~s|get "/help/about/more", PageController, :help|},
+            {"", ~s|get "/help", PageController, :help|},
+            {~s|get "/help/about", PageController, :help|, ""}
+          ] do
+        warnings =
+          router_warnings("""
+          #{before}
+
+          locale_prefix do
+            get "/about", PageController, :about
+          end
+
+          #{later}
+          """)
+
+        assert warnings == "", inspect({before, later})
+      end
+    end
+
+    test "does not warn of an overlap within a block, which its routes have as written" do
+      warnings =
+        router_warnings("""
+        locale_prefix do
+          get "/products/:id", PageController, :show
+          get "/products/new", PageController, :new
+        end
+        """)
+
+      assert warnings == ""
+    end
+
+    test "warns once for a route, however many blocks the router has" do
+      warnings =
+        router_warnings("""
+        locale_prefix do
+          get "/about", PageController, :about
+        end
+
+        locale_prefix do
+          get "/contact", PageController, :contact
+        end
+
+        get "/help/about", PageController, :help
+        """)
+
+      assert length(String.split(warnings, "get /help/about is not reached")) == 2
     end
   end
 end
