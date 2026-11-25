@@ -45,7 +45,7 @@ defmodule Localize.Plug.LocalePrefix do
   require Logger
 
   alias Localize.Plug.PutLocale
-  alias Localize.Routes.Prefix
+  alias Localize.Routes.{Prefix, Request}
 
   @private_key :localize_locale_prefix
   @modes [:prefix_others, :prefix_all]
@@ -78,13 +78,13 @@ defmodule Localize.Plug.LocalePrefix do
 
   ### Options
 
-  * `:mode` is the URL mode, `:prefix_others` or `:prefix_all`, or a `{Module, function}` or `{Module, function, args}` tuple whose function is called with the `conn`, followed by `args`, and returns it. The default is `:prefix_others`.
+  * `:mode` is the URL mode, `:prefix_others` or `:prefix_all`, or a `{Module, function}` or `{Module, function, args}` tuple whose function is called with the request as a `t:Localize.Routes.Request.t/0`, followed by `args`, and returns it. The default is `:prefix_others`.
 
   * `:default` is the default locale, which has no prefix under `:prefix_others`, or a function that returns it, called as for `:mode`. The default is `Localize.Plug.PutLocale`'s default locale, and else `Localize.default_locale/0`.
 
   * `:supported` is the list of supported locales, or a function that returns it, called as for `:mode`. The default is the list `Localize.Plug.PutLocale` matched the request against.
 
-  * `:exists?` is a `{Module, function}` or `{Module, function, args}` tuple whose function is called with the `conn`, the path without its prefix and the locale as a `t:Localize.LanguageTag.t/0`, followed by `args`, and returns whether the page exists in that locale. It is consulted only for a `302` under `:prefix_all`. The default is none: every page exists in every locale.
+  * `:exists?` is a `{Module, function}` or `{Module, function, args}` tuple whose function is called with the request as a `t:Localize.Routes.Request.t/0`, the path without its prefix and the locale as a `t:Localize.LanguageTag.t/0`, followed by `args`, and returns whether the page exists in that locale. It is consulted only for a `302` under `:prefix_all`. The default is none: every page exists in every locale.
 
   * `:param` is the name of the path parameter holding the locale. The default is `Localize.Plug.PutLocale`'s `:param`, `"locale"`.
 
@@ -154,7 +154,7 @@ defmodule Localize.Plug.LocalePrefix do
 
   ### Returns
 
-  * A map with `:mode`, `:default`, `:supported` and `:param`, as the plug resolved them for the request, or
+  * A map with `:mode`, `:default`, `:supported`, `:param` and `:exists?`, as the plug resolved them for the request, or
 
   * `nil` when the plug has not run on `conn`.
 
@@ -177,7 +177,7 @@ defmodule Localize.Plug.LocalePrefix do
     case resolve(conn, options, settings) do
       {:ok, resolved} ->
         conn
-        |> put_private(@private_key, Map.delete(resolved, :exists?))
+        |> put_private(@private_key, Map.delete(resolved, :exists_test))
         |> route(resolved)
 
       {:error, exception} ->
@@ -186,15 +186,20 @@ defmodule Localize.Plug.LocalePrefix do
   end
 
   defp resolve(conn, options, settings) do
-    with {:ok, mode} <- mode(resolve_option(conn, Keyword.get(options, :mode, :prefix_others))),
-         {:ok, supported} <- supported(conn, options, settings) do
+    request = Request.from_conn(conn)
+
+    with {:ok, mode} <- mode(resolve_option(request, Keyword.get(options, :mode, :prefix_others))),
+         {:ok, supported} <- supported(request, options, settings) do
+      exists = Keyword.get(options, :exists?)
+
       {:ok,
        %{
          mode: mode,
-         default: default(conn, options, settings),
+         default: default(conn, request, options, settings),
          supported: supported,
          param: Keyword.get(options, :param) || Keyword.get(settings, :param, "locale"),
-         exists?: exists(conn, Keyword.get(options, :exists?))
+         exists?: exists,
+         exists_test: exists_test(request, exists)
        }}
     end
   end
@@ -208,7 +213,7 @@ defmodule Localize.Plug.LocalePrefix do
         mode: resolved.mode,
         default: resolved.default,
         supported: resolved.supported,
-        exists?: resolved.exists?
+        exists?: resolved.exists_test
       )
 
     apply_target(conn, target, path, resolved)
@@ -256,7 +261,10 @@ defmodule Localize.Plug.LocalePrefix do
     nil
   end
 
-  defp supported_prefix?(value, supported) do
+  @doc false
+  # Whether a locale parameter names a supported locale exactly.
+  # `Localize.Live.LocalePrefix` applies the same test on a navigation.
+  def supported_prefix?(value, supported) do
     case Prefix.split("/" <> value, supported) do
       {:ok, {%Localize.LanguageTag{}, "/"}} -> true
       _other -> false
@@ -290,15 +298,18 @@ defmodule Localize.Plug.LocalePrefix do
     end
   end
 
-  defp resolve_option(conn, {module, function}) do
-    apply(module, function, [conn])
+  @doc false
+  # An option's value, calling it with the request when it is a function.
+  # `Localize.Live.LocalePrefix` resolves options the same way.
+  def resolve_option(%Request{} = request, {module, function}) do
+    apply(module, function, [request])
   end
 
-  defp resolve_option(conn, {module, function, args}) do
-    apply(module, function, [conn | args])
+  def resolve_option(%Request{} = request, {module, function, args}) do
+    apply(module, function, [request | args])
   end
 
-  defp resolve_option(_conn, value) do
+  def resolve_option(_request, value) do
     value
   end
 
@@ -314,10 +325,10 @@ defmodule Localize.Plug.LocalePrefix do
      )}
   end
 
-  defp supported(conn, options, settings) do
+  defp supported(request, options, settings) do
     supported =
       if Keyword.has_key?(options, :supported) do
-        resolve_option(conn, options[:supported])
+        resolve_option(request, options[:supported])
       else
         Keyword.get(settings, :supported)
       end
@@ -333,24 +344,27 @@ defmodule Localize.Plug.LocalePrefix do
     end
   end
 
-  defp default(conn, options, settings) do
+  defp default(conn, request, options, settings) do
     if Keyword.has_key?(options, :default) do
-      resolve_option(conn, options[:default])
+      resolve_option(request, options[:default])
     else
       PutLocale.__default_locale__(conn, settings) || Localize.default_locale()
     end
   end
 
-  defp exists(_conn, nil) do
+  @doc false
+  # The `:exists?` option as the two-argument test `Localize.Routes.Prefix`
+  # takes, calling the application's function with the request.
+  def exists_test(_request, nil) do
     nil
   end
 
-  defp exists(conn, {module, function}) do
-    fn rest, locale -> apply(module, function, [conn, rest, locale]) end
+  def exists_test(%Request{} = request, {module, function}) do
+    fn rest, locale -> apply(module, function, [request, rest, locale]) end
   end
 
-  defp exists(conn, {module, function, args}) do
-    fn rest, locale -> apply(module, function, [conn, rest, locale | args]) end
+  def exists_test(%Request{} = request, {module, function, args}) do
+    fn rest, locale -> apply(module, function, [request, rest, locale | args]) end
   end
 
   defp warn(conn, exception) do

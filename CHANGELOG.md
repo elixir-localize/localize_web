@@ -24,7 +24,9 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Routes.locale_prefix/2` declares a block's routes as written and under `/:locale`, so a LiveView connects, patches and navigates live between `/about` and `/fr/about`. A route with a dynamic first segment is refused, and a later route the copies would shadow is warned of, at compile time.
 
-* `Localize.Plug.LocalePrefix` applies a URL mode after `Localize.Plug.PutLocale`: a `301` from the default locale's prefix or a `302` to the visitor's locale, and a `404` for a locale parameter naming no supported locale. Its mode, default, supported locales and `:exists?` test may be functions of the request.
+* `Localize.Plug.LocalePrefix` applies a URL mode after `Localize.Plug.PutLocale`: a `301` from the default locale's prefix or a `302` to the visitor's locale, and a `404` for a locale parameter naming no supported locale. Its mode, default, supported locales and `:exists?` test may be functions of a `Localize.Routes.Request`.
+
+* `Localize.Live.LocalePrefix` makes the same decision on each live navigation, from the settings `session/1` signs into the page, and puts them on the socket for `Localize.Routes.Prefix.localized_path/3`.
 
 ### Changed
 

@@ -42,7 +42,7 @@ defmodule Localize.Plug.LocalePrefixTest do
     {conn.halted, PutLocale.get_locale(conn).cldr_locale_id, PutLocale.get_locale_source(conn)}
   end
 
-  def url_mode(%Plug.Conn{host: "all.example"}) do
+  def url_mode(%Localize.Routes.Request{host: "all.example"}) do
     :prefix_all
   end
 
@@ -50,7 +50,7 @@ defmodule Localize.Plug.LocalePrefixTest do
     :prefix_others
   end
 
-  def site_locales(%Plug.Conn{host: "de.example"}, extra) do
+  def site_locales(%Localize.Routes.Request{host: "de.example"}, extra) do
     ["de" | extra]
   end
 
@@ -58,7 +58,12 @@ defmodule Localize.Plug.LocalePrefixTest do
     ["en", "fr" | extra]
   end
 
-  def published?(%Plug.Conn{} = _conn, rest, locale, published \\ %{"/about" => [:en, :fr]}) do
+  def published?(
+        %Localize.Routes.Request{} = _request,
+        rest,
+        locale,
+        published \\ %{"/about" => [:en, :fr]}
+      ) do
     locale.cldr_locale_id in Map.get(published, rest, [])
   end
 
@@ -228,7 +233,8 @@ defmodule Localize.Plug.LocalePrefixTest do
                mode: :prefix_others,
                default: Localize.LanguageTag.new!("de"),
                supported: ["de", "fr"],
-               param: "locale"
+               param: "locale",
+               exists?: nil
              }
 
       assert redirect(

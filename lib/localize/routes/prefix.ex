@@ -297,7 +297,7 @@ defmodule Localize.Routes.Prefix do
 
   defp build_localized_path(source, path, locale) do
     with {:ok, settings} <- source_settings(source) do
-      {script, relative} = split_script(path, script_prefix(source))
+      {script, relative} = __split_script__(path, source)
 
       options = [
         mode: Map.get(settings, :mode, @default_mode),
@@ -361,6 +361,14 @@ defmodule Localize.Routes.Prefix do
 
   defp source_locale(_source) do
     Localize.get_locale()
+  end
+
+  @doc false
+  # A path split into the script name a verified route puts in front of it
+  # in a mounted application, and the rest. `Localize.Live.LocalePrefix`
+  # splits the URI of a navigation the same way.
+  def __split_script__(path, source) do
+    split_script(path, script_prefix(source))
   end
 
   # The script name a verified route puts in front of a path in a mounted

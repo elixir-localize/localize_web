@@ -131,11 +131,13 @@ A CMS with one catch-all route needs no macro: `/*path` already matches `/fr/abo
 
 ### `Localize.Live.LocalePrefix` — on a live navigation
 
-An `on_mount` hook that attaches a `handle_params` hook. On each navigation it splits the URI with `Localize.Routes.Prefix.split/2`, puts the locale for Localize and Gettext, and calls `target/4`; a redirect becomes a `push_navigate`. It is defined only when Phoenix LiveView is loaded.
+An `on_mount` hook that attaches a `handle_params` hook. On each navigation it reads the locale parameter from the route the path matches (`Phoenix.Router.route_info/4`, since the params a hook receives include the query string's) and raises `NotFoundError` for one naming no supported locale, which ends a connected LiveView so the browser loads the address and the plug answers `404`. It then calls `target/3` and puts the locale for Localize and Gettext, or pushes a redirect as a `push_navigate`. It is defined only when Phoenix LiveView is loaded.
+
+The hook takes the plug's settings rather than options of its own: `Localize.Live.LocalePrefix.session/1`, given as the live session's `:session`, signs the locale `PutLocale` set and the settings `LocalePrefix` resolved into the page, without writing the session cookie, as `Localize.Plug.live_session_locale/1` does for the locale. A site whose settings are functions of the request resolves them once, at the page's HTTP request. The hook's own options are only `:gettext` and `:session_key`. It puts the settings in the socket's private `:localize_locale_prefix`, where `localized_path/3` reads them.
 
 ### Functions of the request
 
-The options that may be functions are called with the `conn` by the plugs. A live navigation has no `conn`, so the hook calls them with a `Localize.Routes.Request` holding the host, the path, the session and the socket's assigns. A function that finds a site from the host, or from an assign set by the application's own `on_mount`, finds it the same way in both. The request form is accepted by the new plug and hook from the start; `PutLocale`'s existing `conn` functions are left as they are.
+The options of `Localize.Plug.LocalePrefix` that may be functions are called with a `Localize.Routes.Request`, holding the host, the path, the session and the assigns, built from the `conn`. The hook calls `:exists?` with one built from the navigation's URI, the session and the socket's assigns, so a function that finds a site from the host, or from an assign, finds it the same way in both. `PutLocale`'s existing `conn` functions are left as they are.
 
 ## Spike: stripping the prefix
 
@@ -169,8 +171,6 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 * **Does a `302` also carry `cache-control: private`?** `vary` already keeps a shared cache from serving one visitor's redirect to another, but some caches ignore it. Recommended: `vary` by default and a `:cache_control` option.
 
-* **Does the hook push a redirect, or hand the decision to the LiveView?** Recommended: push it, with an option to receive the decision instead.
-
 * **Is a `~P` sigil worth adding over `localized_path/3`?** A sigil reads well in templates but adds to Routex's and `Localize.VerifiedRoutes`'s `~q`. The function has landed; a sigil waits for demand.
 
 ## Testing
@@ -187,11 +187,11 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ## Tasks
 
-* [ ] **`Localize.Live.LocalePrefix`** — the `on_mount` and `handle_params` hook, and `Localize.Routes.Request` for its functions, with the parity test.
-
 * [ ] **A guide** — runtime locale routing beside `Localize.Routes`: when each fits, an ordinary router with `locale_prefix`, and a CMS with a catch-all route, sites, modes, alternates and a switcher built with `Localize.Routes.Prefix.path/3`.
 
 ### Done
+
+* [x] **`Localize.Live.LocalePrefix`** — the `on_mount` and `handle_params` hook with `session/1`, `Localize.Routes.Request` for the plug's and the hook's functions, and the parity test through a router, an endpoint and a LiveView in both modes. 2026-11-25.
 
 * [x] **`Localize.Routes.Prefix`** — `split/2`, `path/3`, `target/3` and `localized_path/3`, with `:path_prefix` moved onto `split/2`. `localized_path/3` reads the settings `Localize.Plug.LocalePrefix` resolved (a conn), the live hook's (a socket's `:localize_locale_prefix` private key) or a map, keeps a script name in front of the prefix, and logs and returns the path when it cannot localize it. 2026-11-25.
 

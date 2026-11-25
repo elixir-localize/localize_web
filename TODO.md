@@ -8,7 +8,7 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## In progress
 
-* [ ] **Runtime locale routing** — an optional locale prefix handled at runtime: the two URL modes with their redirects, routes declared plainly and under `/:locale` from one block, the same rules on live navigation, and address helpers; for ordinary routers and for CMS-style catch-all routing (mishka_cms_core's shape). `Localize.Routes.Prefix` (`split/2`, `path/3`, `target/3`), the `locale_prefix/2` router macro and `Localize.Plug.LocalePrefix` have landed. Design in [plans/runtime-locale-routing.md](plans/runtime-locale-routing.md).
+* [ ] **Runtime locale routing** — an optional locale prefix handled at runtime: the two URL modes with their redirects, routes declared plainly and under `/:locale` from one block, the same rules on live navigation, and address helpers; for ordinary routers and for CMS-style catch-all routing (mishka_cms_core's shape). `Localize.Routes.Prefix` (`split/2`, `path/3`, `target/3`), the `locale_prefix/2` router macro, `Localize.Plug.LocalePrefix` and `Localize.Live.LocalePrefix` have landed; the guide remains. Design in [plans/runtime-locale-routing.md](plans/runtime-locale-routing.md).
 
 ## Deferred
 

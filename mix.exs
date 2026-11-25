@@ -83,12 +83,14 @@ defmodule LocalizeWeb.MixProject do
           Localize.Plug.PutSession,
           Localize.Plug.LocalePrefix,
           Localize.Plug.LocalePrefix.NotFoundError,
+          Localize.Live.LocalePrefix,
           Localize.Plug.AcceptLanguage,
           Localize.AcceptLanguage
         ],
         Routes: [
           Localize.Routes,
           Localize.Routes.Prefix,
+          Localize.Routes.Request,
           Localize.VerifiedRoutes,
           Localize.Routes.LocalizedHelpers
         ],
