@@ -3,6 +3,8 @@ defmodule Localize.HTML.Locale.Test do
 
   import Phoenix.HTML, only: [safe_to_string: 1]
 
+  doctest Localize.HTML.Locale
+
   describe "locale_select/3" do
     test "with selected locale" do
       string =

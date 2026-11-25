@@ -64,6 +64,12 @@ defmodule Localize.Plug.AcceptLanguage do
 
   * A `t:Localize.LanguageTag.t/0` or `nil`.
 
+  ### Examples
+
+      iex> options = Localize.Plug.AcceptLanguage.init([])
+      iex> Localize.Plug.AcceptLanguage.best_match("fr, en;q=0.5", options).cldr_locale_id
+      :fr
+
   """
   def best_match(nil, _options) do
     nil
@@ -109,7 +115,21 @@ defmodule Localize.Plug.AcceptLanguage do
 
   * A `t:Localize.LanguageTag.t/0`, or `nil` when no locale was set or `conn` is not a `t:Plug.Conn.t/0`.
 
+  ### Examples
+
+      iex> conn =
+      ...>   Plug.Test.conn(:get, "/")
+      ...>   |> Plug.Conn.put_req_header("accept-language", "fr, en;q=0.5")
+      ...>   |> Localize.Plug.AcceptLanguage.call(Localize.Plug.AcceptLanguage.init([]))
+      iex> Localize.Plug.AcceptLanguage.get_locale(conn).cldr_locale_id
+      :fr
+
   """
-  def get_locale(%Plug.Conn{private: private}), do: private[:localize_locale]
-  def get_locale(_conn), do: nil
+  def get_locale(%Plug.Conn{private: private}) do
+    private[:localize_locale]
+  end
+
+  def get_locale(_conn) do
+    nil
+  end
 end

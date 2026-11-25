@@ -62,7 +62,7 @@ defmodule Localize.HTML do
   * `msgid` is an MF2 message string literal. May contain Elixir
     `\#{expr}` interpolations.
 
-  * `options` is a keyword list of options (only `t/2`).
+  * `options` is a keyword list of options. The default is `[]`.
 
   ### Options
 
@@ -85,8 +85,9 @@ defmodule Localize.HTML do
       {t("Click {#link patch=|/x|}here{/link}", locale: :fr)}
 
   """
-  defmacro t(msgid), do: build_t_ast(msgid, [], __CALLER__)
-  defmacro t(msgid, options), do: build_t_ast(msgid, options, __CALLER__)
+  defmacro t(msgid, options \\ []) do
+    build_t_ast(msgid, options, __CALLER__)
+  end
 
   defp build_t_ast(msgid_ast, options_ast, caller) do
     config = Localize.Message.Sigils.fetch_config!(caller, [])

@@ -272,6 +272,10 @@ defmodule Localize.Plug.PutLocale do
   @doc """
   Returns the name of the session key used to store the locale.
 
+  ### Returns
+
+  * The session key, a string.
+
   ### Examples
 
       iex> Localize.Plug.PutLocale.session_key()
@@ -333,9 +337,22 @@ defmodule Localize.Plug.PutLocale do
 
   * A `t:Localize.LanguageTag.t/0`, or `nil` when no locale was set or `conn` is not a `t:Plug.Conn.t/0`.
 
+  ### Examples
+
+      iex> conn =
+      ...>   Plug.Test.conn(:get, "/?locale=fr")
+      ...>   |> Localize.Plug.PutLocale.call(Localize.Plug.PutLocale.init(from: [:query]))
+      iex> Localize.Plug.PutLocale.get_locale(conn).cldr_locale_id
+      :fr
+
   """
-  def get_locale(%Plug.Conn{private: private}), do: private[@private_key]
-  def get_locale(_conn), do: nil
+  def get_locale(%Plug.Conn{private: private}) do
+    private[@private_key]
+  end
+
+  def get_locale(_conn) do
+    nil
+  end
 
   @doc """
   Returns the source that decided the locale set by `Localize.Plug.PutLocale`.
@@ -353,6 +370,14 @@ defmodule Localize.Plug.PutLocale do
   * `:default` when no source had a locale and the `:default` option supplied it, or
 
   * `nil` when no locale was set or `conn` is not a `t:Plug.Conn.t/0`.
+
+  ### Examples
+
+      iex> conn =
+      ...>   Plug.Test.conn(:get, "/?locale=fr")
+      ...>   |> Localize.Plug.PutLocale.call(Localize.Plug.PutLocale.init(from: [:query]))
+      iex> Localize.Plug.PutLocale.get_locale_source(conn)
+      :query
 
   """
   @spec get_locale_source(term()) ::

@@ -3,6 +3,8 @@ defmodule Localize.HTML.Unit.Test do
 
   import Phoenix.HTML, only: [safe_to_string: 1]
 
+  doctest Localize.HTML.Unit
+
   describe "unit_select/3" do
     test "with selected unit" do
       string =

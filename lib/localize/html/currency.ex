@@ -99,6 +99,11 @@ defmodule Localize.HTML.Currency do
 
   * `{:error, exception}` when an option is invalid.
 
+  ### Examples
+
+      iex> Localize.HTML.Currency.currency_options(currencies: [:USD, :EUR, :JPY], locale: :de)
+      [{"EUR - Euro", "EUR"}, {"JPY - Japanischer Yen", "JPY"}, {"USD - US-Dollar", "USD"}]
+
   """
   @spec currency_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 

@@ -6,6 +6,8 @@ defmodule Localize.Plug.AcceptLanguageTest do
 
   alias Localize.Plug.AcceptLanguage
 
+  doctest Localize.Plug.AcceptLanguage
+
   describe "init/1" do
     test "default options" do
       options = AcceptLanguage.init([])

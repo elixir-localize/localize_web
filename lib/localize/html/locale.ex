@@ -117,6 +117,11 @@ defmodule Localize.HTML.Locale do
 
   * `{:error, exception}` when an option is invalid.
 
+  ### Examples
+
+      iex> Localize.HTML.Locale.locale_options(locales: [:en, :fr, :de], locale: :en)
+      [{"English", "en"}, {"French", "fr"}, {"German", "de"}]
+
   """
   @spec locale_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 

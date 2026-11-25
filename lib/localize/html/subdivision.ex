@@ -98,7 +98,13 @@ defmodule Localize.HTML.Subdivision do
   @doc """
   Returns the subdivisions of a territory as a list of `{name, code}` tuples.
 
-  Takes the same options as `select/3`.
+  ### Arguments
+
+  * `options` is a `t:Keyword.t/0` list of options.
+
+  ### Options
+
+  See `Localize.HTML.Subdivision.select/3` for options.
 
   ### Returns
 

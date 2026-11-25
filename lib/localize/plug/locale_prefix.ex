@@ -94,6 +94,11 @@ defmodule Localize.Plug.LocalePrefix do
 
   An option that is not valid raises an `ArgumentError`, when the router or endpoint that declares the plug is compiled.
 
+  ### Examples
+
+      iex> Localize.Plug.LocalePrefix.init(mode: :prefix_all)
+      [mode: :prefix_all]
+
   """
   @impl Plug
   def init(options) do
@@ -127,6 +132,16 @@ defmodule Localize.Plug.LocalePrefix do
   ### Returns
 
   * The `conn`, redirected and halted, with its locale replaced, or as it was. With no `Localize.Plug.PutLocale` before it, or when an option resolves to a value that is not valid, the plug logs a warning and returns the `conn` as it was.
+
+  ### Examples
+
+  The plug is called from a router pipeline, after `Localize.Plug.PutLocale`:
+
+      pipeline :browser do
+        plug :fetch_session
+        plug Localize.Plug.PutLocale, from: [:path_prefix, :session, :accept_language]
+        plug Localize.Plug.LocalePrefix, mode: :prefix_all
+      end
 
   """
   @impl Plug
@@ -253,12 +268,8 @@ defmodule Localize.Plug.LocalePrefix do
     end
   end
 
-  defp path_param(%Plug.Conn{path_params: %{} = params}, param) do
+  defp path_param(%Plug.Conn{path_params: params}, param) do
     Map.get(params, param)
-  end
-
-  defp path_param(_conn, _param) do
-    nil
   end
 
   @doc false

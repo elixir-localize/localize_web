@@ -139,6 +139,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     * `{:cont, socket}`.
 
+    ### Examples
+
+    LiveView calls the hook for each live view of a live session that names it:
+
+        live_session :default,
+          on_mount: [{Localize.Live.LocalePrefix, gettext: MyApp.Gettext}],
+          session: {Localize.Live.LocalePrefix, :session, []} do
+          locale_prefix do
+            live "/about", AboutLive
+          end
+        end
+
     """
     @spec on_mount(atom() | Keyword.t(), map() | atom(), map(), Phoenix.LiveView.Socket.t()) ::
             {:cont, Phoenix.LiveView.Socket.t()}
@@ -257,10 +269,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp same_locale?(%Localize.LanguageTag{} = current, %Localize.LanguageTag{} = locale) do
       current.canonical_locale_id == locale.canonical_locale_id
-    end
-
-    defp same_locale?(_current, _locale) do
-      false
     end
 
     defp put_locale(locale, backends) do

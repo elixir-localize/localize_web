@@ -3,6 +3,8 @@ defmodule Localize.HTML.Currency.Test do
 
   import Phoenix.HTML, only: [safe_to_string: 1]
 
+  doctest Localize.HTML.Currency
+
   describe "currency_select/3" do
     test "with selected currency" do
       string =

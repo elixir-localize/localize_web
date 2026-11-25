@@ -218,8 +218,21 @@ defmodule Localize.Routes do
   Generates localised routes for each locale defined in the
   configured Gettext backend.
 
-  This macro is intended to wrap a series of standard route
-  definitions in a `do` block. For example:
+  The block's path segments are translated at compile time with the
+  `"routes"` domain of the Gettext backend given to
+  `use Localize.Routes`, once for each of its locales.
+
+  ### Arguments
+
+  * `block` is the routes to localize, in a `do` block: `get/3`,
+    `post/3`, `resources/3`, `live/3` and the other route macros.
+
+  ### Returns
+
+  * The block's routes, declared once for each locale of the Gettext
+    backend, in the router that calls it.
+
+  ### Examples
 
       localize do
         get "/pages/:page", PageController, :show
@@ -227,6 +240,8 @@ defmodule Localize.Routes do
       end
 
   """
+  defmacro localize(block)
+
   defmacro localize(do: {:__block__, meta, routes}) do
     translated_routes =
       for route <- routes do
@@ -253,8 +268,24 @@ defmodule Localize.Routes do
   @doc """
   Generates localised routes for each locale provided.
 
-  This macro is intended to wrap a series of standard route
-  definitions in a `do` block. For example:
+  The block's path segments are translated at compile time with the
+  `"routes"` domain of the Gettext backend given to
+  `use Localize.Routes`, once for each locale given.
+
+  ### Arguments
+
+  * `locale_ids` is a list of locale identifiers, or a single locale
+    identifier, as atoms or strings.
+
+  * `block` is the routes to localize, in a `do` block: `get/3`,
+    `post/3`, `resources/3`, `live/3` and the other route macros.
+
+  ### Returns
+
+  * The block's routes, declared once for each locale given, in the
+    router that calls it.
+
+  ### Examples
 
       localize [:en, :fr] do
         get "/pages/:page", PageController, :show
@@ -262,6 +293,8 @@ defmodule Localize.Routes do
       end
 
   """
+  defmacro localize(locale_ids, block)
+
   defmacro localize(locale_ids, do: {:__block__, meta, routes})
            when is_list(locale_ids) do
     translated_routes =
@@ -407,7 +440,9 @@ defmodule Localize.Routes do
 
   """
   @doc since: "1.2.0"
-  defmacro localize_live_session(name, options \\ [], do: block) when is_atom(name) do
+  defmacro localize_live_session(name, options \\ [], block)
+
+  defmacro localize_live_session(name, options, do: block) when is_atom(name) do
     gettext_backend = Module.get_attribute(__CALLER__.module, :_gettext_backend)
 
     if not Keyword.keyword?(options) do
@@ -477,6 +512,10 @@ defmodule Localize.Routes do
 
   * `:param` is the name of the path parameter holding the locale. The default is `"locale"`, the parameter `Localize.Plug.PutLocale` reads by default.
 
+  ### Returns
+
+  * The block's routes, declared as written and under the locale prefix, in the router that calls it.
+
   ### Restrictions
 
   Phoenix answers a request with the first route that matches it, so the prefixed copies are checked at compile time, and an `ArgumentError` is raised for:
@@ -501,7 +540,9 @@ defmodule Localize.Routes do
 
   """
   @doc since: "1.5.0"
-  defmacro locale_prefix(options \\ [], do: block) do
+  defmacro locale_prefix(options \\ [], block)
+
+  defmacro locale_prefix(options, do: block) do
     param = locale_prefix_param!(options)
     check_locale_prefix_route!(block)
     register_shadowing_check(__CALLER__.module)

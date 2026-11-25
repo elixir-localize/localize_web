@@ -99,6 +99,11 @@ defmodule Localize.HTML.Unit do
 
   * `{:error, exception}` when an option is invalid.
 
+  ### Examples
+
+      iex> Localize.HTML.Unit.unit_options(units: [:kilometer, :mile, :meter], locale: :en)
+      [{"kilometers", "kilometer"}, {"meters", "meter"}, {"miles", "mile"}]
+
   """
   @spec unit_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 

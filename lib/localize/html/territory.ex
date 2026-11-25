@@ -112,6 +112,14 @@ defmodule Localize.HTML.Territory do
 
   * `{:error, exception}` when an option is invalid.
 
+  ### Examples
+
+  The names sort in the display locale's collation, so "Ägypten" comes first in German:
+
+      iex> options = Localize.HTML.Territory.territory_options(territories: [:US, :DE, :EG], locale: :de)
+      iex> Enum.map(options, &elem(&1, 1))
+      [:EG, :DE, :US]
+
   """
   @spec territory_options(select_options) :: list(tuple()) | {:error, Exception.t()}
 
