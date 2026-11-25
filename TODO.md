@@ -4,6 +4,8 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## Open
 
+* [ ] **Runtime locale routing** — an optional locale prefix handled at runtime: the two URL modes with their redirects, prefix stripping so one set of routes (and verified routes) serves every language, the same rules on live navigation, and address helpers; for ordinary routers and for CMS-style runtime routing (mishka_cms_core's shape). Design in [plans/runtime-locale-routing.md](plans/runtime-locale-routing.md).
+
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
 
 ## Deferred
