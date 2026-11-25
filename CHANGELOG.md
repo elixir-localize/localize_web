@@ -24,6 +24,8 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Routes.locale_prefix/2` declares a block's routes as written and under `/:locale`, so a LiveView connects, patches and navigates live between `/about` and `/fr/about`. A route with a dynamic first segment is refused, and a later route the copies would shadow is warned of, at compile time.
 
+* `Localize.Plug.LocalePrefix` applies a URL mode after `Localize.Plug.PutLocale`: a `301` from the default locale's prefix or a `302` to the visitor's locale, and a `404` for a locale parameter naming no supported locale. Its mode, default, supported locales and `:exists?` test may be functions of the request.
+
 ### Changed
 
 * The select helpers for currencies, territories, locales and units sort by `Localize.Collation` in the display locale, as subdivisions did with root collation; they sorted by UTF-8 bytes, which put "Ägypten" after "Simbabwe". Tailored locales such as `ja` and `zh` sort quickly from Localize 1.10.

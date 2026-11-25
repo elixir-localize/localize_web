@@ -81,6 +81,8 @@ defmodule LocalizeWeb.MixProject do
           Localize.Plug.NoSessionLocaleError,
           Localize.Plug.PutLocale,
           Localize.Plug.PutSession,
+          Localize.Plug.LocalePrefix,
+          Localize.Plug.LocalePrefix.NotFoundError,
           Localize.Plug.AcceptLanguage,
           Localize.AcceptLanguage
         ],

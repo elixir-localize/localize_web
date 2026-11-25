@@ -96,7 +96,7 @@ Runs after `Localize.Plug.PutLocale`, which has resolved the locale from `:path_
 
 * A `:locale` path parameter that names no supported locale is answered `404`, since the route captured a path that is not a localized address: `/blog/about` matches `/:locale/about` with `locale: "blog"`.
 
-The plug goes in the router's pipeline, after `PutLocale`.
+The plug goes in the router's pipeline, after `PutLocale`, whose settings it shares: `PutLocale` keeps its options, with its supported locales resolved for the request, in `conn.private`, so the supported locales, the default and the parameter name are given once. The `404` is raised as `Localize.Plug.LocalePrefix.NotFoundError`, with `plug_status: 404`, so Phoenix renders the application's not-found page. Only `GET` and `HEAD` are redirected; a browser follows a redirect of any other method with a `GET`.
 
 ### `Localize.Routes.locale_prefix/2` — for an ordinary router
 
@@ -167,8 +167,6 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ## Open questions
 
-* **Is an unsupported `:locale` a `404`, or passed on with no locale?** Recommended: `404`, since the address is not one the site publishes.
-
 * **Does a `302` also carry `cache-control: private`?** `vary` already keeps a shared cache from serving one visitor's redirect to another, but some caches ignore it. Recommended: `vary` by default and a `:cache_control` option.
 
 * **Does the hook push a redirect, or hand the decision to the LiveView?** Recommended: push it, with an option to receive the decision instead.
@@ -189,15 +187,15 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ## Tasks
 
-* [ ] **`Localize.Routes.Prefix`** — `split/2`, `path/3` and `target/3`, with `:path_prefix` moved onto `split/2`, have landed. `localized_path/2` waits on the plug, which decides where a request's mode and default are kept.
-
-* [ ] **`Localize.Plug.LocalePrefix`** — the two modes, the `404` for an unsupported `:locale`, the optional `:exists?`, the query string and the `vary` of a `302`.
+* [ ] **`Localize.Routes.Prefix`** — `split/2`, `path/3` and `target/3`, with `:path_prefix` moved onto `split/2`, have landed. `localized_path/2` remains: the plug keeps a request's mode, default and supported locales in `conn.private`, read by `Localize.Plug.LocalePrefix.get_settings/1`, and the live hook will keep them in the socket.
 
 * [ ] **`Localize.Live.LocalePrefix`** — the `on_mount` and `handle_params` hook, and `Localize.Routes.Request` for its functions, with the parity test.
 
 * [ ] **A guide** — runtime locale routing beside `Localize.Routes`: when each fits, an ordinary router with `locale_prefix`, and a CMS with a catch-all route, sites, modes, alternates and a switcher built with `Localize.Routes.Prefix.path/3`.
 
 ### Done
+
+* [x] **`Localize.Plug.LocalePrefix`** — both modes, a `404` (a `NotFoundError` with `plug_status: 404`) for an unsupported locale parameter, `:exists?`, the query string and the script name kept, redirects for `GET` and `HEAD` only; `PutLocale` keeps its settings in `conn.private` for it, and its `vary` serves the `302`. 2026-11-25.
 
 * [x] **`Localize.Routes.locale_prefix/2`** — declares a block plainly and under `/:param`; refuses a dynamic first segment, `forward`, `live_session` and nested blocks at compile time. A later route a prefixed copy matches first is warned of at compile time. Verified routes accept any one-segment path once `/` is in the block, which is documented. 2026-11-25.
 

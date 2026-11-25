@@ -2,6 +2,7 @@ defmodule Localize.Plug.PutLocale do
   @private_key :localize_locale
   @source_key :localize_locale_source
   @session_key_private :localize_session_key
+  @settings_private :localize_put_locale_settings
   @session_key "localize_locale"
 
   @default_from [:route, :path, :query, :session, :accept_language]
@@ -164,21 +165,51 @@ defmodule Localize.Plug.PutLocale do
       conn
       |> put_vary(consulted, options[:vary])
       |> put_private(@session_key_private, options[:session_key])
+      |> put_private(@settings_private, options)
 
     if locale do
-      Localize.put_locale(locale)
-
-      Enum.each(options[:gettext], fn gettext_backend ->
-        put_gettext_locale(gettext_backend, locale)
-      end)
-
-      conn
-      |> put_private(@private_key, locale)
-      |> put_private(@source_key, source)
-      |> put_content_language(locale, options[:content_language])
+      set_locale(conn, locale, source, options)
     else
       conn
     end
+  end
+
+  @doc false
+  # The options of the `PutLocale` that ran for this request, with its
+  # supported locales resolved for it, or `nil` when none ran. A plug that
+  # runs after it, such as `Localize.Plug.LocalePrefix`, reads its
+  # settings here rather than being given them again.
+  def __settings__(%Plug.Conn{private: private}) do
+    private[@settings_private]
+  end
+
+  @doc false
+  # The default locale of the `PutLocale` that ran for this request, by its
+  # `:default` option, or `nil` when it has none.
+  def __default_locale__(conn, options) do
+    default(conn, options)
+  end
+
+  @doc false
+  # Replaces the locale set for this request, for a plug that decides it
+  # after `PutLocale` has run: the process locale, the Gettext locales, the
+  # stored locale and source, and the `content-language` header, as
+  # `PutLocale` itself sets them.
+  def __put_locale__(conn, locale, source) do
+    set_locale(conn, locale, source, __settings__(conn) || [])
+  end
+
+  defp set_locale(conn, locale, source, options) do
+    Localize.put_locale(locale)
+
+    options
+    |> Keyword.get(:gettext, [])
+    |> Enum.each(&put_gettext_locale(&1, locale))
+
+    conn
+    |> put_private(@private_key, locale)
+    |> put_private(@source_key, source)
+    |> put_content_language(locale, Keyword.get(options, :content_language, false))
   end
 
   # With `content_language: true` the response names its language, the
