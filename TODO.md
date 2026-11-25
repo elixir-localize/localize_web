@@ -4,8 +4,6 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## Open
 
-* [ ] **A `content-language` response header** — `PutLocale` sets none for the locale it resolved. Low value: search engines mostly ignore it.
-
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
 
 ## Deferred
@@ -13,6 +11,8 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 * [ ] **Store only a chosen locale by default** — `Localize.Plug.PutSession` stores a locale from any source unless given `:from`, so an application gets the first-visit cookie until it opts out. Parked for 2.0: the new default breaks a LiveView in a live session that has not been given `Localize.Plug.live_session_locale/1`.
 
 ## Done
+
+* [x] **A `content-language` response header** — `PutLocale` takes `content_language: true`, which names the canonical tag of the locale it set; off by default. 2026-11-25, unreleased (1.5.0).
 
 * [x] **A language switcher** — `Localize.HTML.LanguageSwitcher.links/2` and `language_switcher/1` from the hreflang map: names in their own language cased for a menu (`capitalization: :ui_list_or_menu`, localize 1.10), `lang`/`dir`, `aria-current`, current matched as the plugs match, collated in the current locale. 2026-11-25, unreleased (1.5.0).
 

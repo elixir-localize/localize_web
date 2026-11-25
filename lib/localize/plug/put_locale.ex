@@ -75,6 +75,8 @@ defmodule Localize.Plug.PutLocale do
 
   * `:supported` is the list of locales the request is matched against, for an application whose locales are known only at runtime, such as a site whose languages are kept in a database. Each entry is a locale identifier string or atom, or a `t:Localize.LanguageTag.t/0`, and should be a locale Localize is configured for, or its data falls back to another locale. It may also be a `{Module, function}` or `{Module, function, args}` tuple, whose function is called with the `conn` and the plug's options, followed by `args`, and returns the list: a function that returns anything else is logged, and no locale is taken from the request. The locale found is then the entry that matched, so `?locale=fr-CA` with `supported: ["en", "fr"]` sets `fr`, and every source is matched against the list but two, which are taken as they stand (`:path_prefix` must name an entry exactly): the tag a localized route stores, and the locale a `{Module, function}` or `{Module, function, args}` source returns. Such a source finds the list in its options under `:supported`. The `:default` locale is not matched. The default is the locales configured for Localize.
 
+  * `:content_language` is `true` or `false`, and says whether the plug puts a `content-language` header naming the canonical BCP 47 tag of the locale it set, such as `fr-CA`, on the response. The default is `false`. The header is set when the plug runs, so a later plug can replace it; no locale set means no header.
+
   * `:session_key` is the session key the `:session` source reads, as a non-empty string. `Localize.Plug.PutSession` writes the locale under the same key and `Localize.Plug.live_session_locale/1` hands it to a LiveView under it; `get_session_key/1` returns it. Two pipelines with different keys keep two locales apart, such as a site's pages and its admin. The default is `"#{@session_key}"`.
 
   * `:vary` is `true` or `false`, and says whether the plug adds the `vary` header described above. The default is `true`. With `false` the plug adds none, and the application declares how its responses vary: for example where a cache inside the application keys on a request header the application derives from the session. A shared cache that is told nothing serves one visitor's language to another.
@@ -148,6 +150,7 @@ defmodule Localize.Plug.PutLocale do
     |> validate_vary(options[:vary])
     |> validate_supported(options[:supported])
     |> validate_session_key(options[:session_key])
+    |> validate_content_language(options[:content_language])
   end
 
   @doc false
@@ -172,8 +175,22 @@ defmodule Localize.Plug.PutLocale do
       conn
       |> put_private(@private_key, locale)
       |> put_private(@source_key, source)
+      |> put_content_language(locale, options[:content_language])
     else
       conn
+    end
+  end
+
+  # With `content_language: true` the response names its language, the
+  # canonical BCP 47 tag of the locale set for it.
+  defp put_content_language(conn, _locale, false) do
+    conn
+  end
+
+  defp put_content_language(conn, locale, true) do
+    case Localize.validate_locale(locale) do
+      {:ok, tag} -> put_resp_header(conn, "content-language", to_string(tag.canonical_locale_id))
+      {:error, _exception} -> conn
     end
   end
 
@@ -858,6 +875,20 @@ defmodule Localize.Plug.PutLocale do
   defp validate_vary(_options, vary) do
     raise ArgumentError,
           "Invalid :vary #{inspect(vary)} detected. :vary must be true or false"
+  end
+
+  defp validate_content_language(options, nil) do
+    Keyword.put(options, :content_language, false)
+  end
+
+  defp validate_content_language(options, content_language) when is_boolean(content_language) do
+    options
+  end
+
+  defp validate_content_language(_options, content_language) do
+    raise ArgumentError,
+          "Invalid :content_language #{inspect(content_language)} detected. " <>
+            ":content_language must be true or false"
   end
 
   defp validate_session_key(options, nil) do

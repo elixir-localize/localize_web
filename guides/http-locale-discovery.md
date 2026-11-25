@@ -208,6 +208,18 @@ Do not decide it from where the locale came from. A locale in the path is on eve
 
 Storing only a locale the visitor chose, with the `:from` option of `Localize.Plug.PutSession`, means a visitor who never chooses sets no cookie, and two such visitors can be served from one stored response. For those visitors the `accept-language` header goes on deciding, so a cache that matches it as written stores one response for each way a browser writes it. A cache that normalises the header before the lookup stores one for each language.
 
+### The `content-language` response header
+
+With `content_language: true` the plug names the language of the response in a `content-language` header, the canonical BCP 47 tag of the locale it set:
+
+```elixir
+plug Localize.Plug.PutLocale,
+  from: [:path_prefix, :session, :accept_language],
+  content_language: true
+```
+
+A request for `/fr-CA/...` matched against `["en", "fr"]` is answered with `content-language: fr`. The header is off by default. It describes the response rather than choosing it, so it adds nothing to `vary`, and most search engines rely on the page's `lang` and `hreflang` annotations instead; it is for clients and caches that read it. A later plug can replace it.
+
 ### Avoiding Localize Calls at Compile Time
 
 Plug options in a Phoenix router pipeline are evaluated when the module compiles. This means any `Localize.*` function call in a plug option executes during `mix compile`, which forces the Localize application to boot inside the compiler's VM and load CLDR data into memory. On memory-constrained build environments (CI runners, Docker builders, Fly.io remote builders) this can cause the compilation to be killed with an out-of-memory error.

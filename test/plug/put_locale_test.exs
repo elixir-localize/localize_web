@@ -1121,6 +1121,53 @@ defmodule Localize.Plug.PutLocaleTest do
     end
   end
 
+  describe "call/2 - content-language header" do
+    defp content_language(path, options) do
+      :get
+      |> conn(path)
+      |> PutLocale.call(PutLocale.init(options))
+      |> get_resp_header("content-language")
+    end
+
+    test "is not set by default" do
+      assert content_language("/?locale=fr", from: [:query]) == []
+    end
+
+    test "names the canonical tag of the locale the plug set" do
+      assert content_language("/?locale=fr", from: [:query], content_language: true) == ["fr"]
+
+      assert content_language("/?locale=it_CH", from: [:query], content_language: true) == [
+               "it-CH"
+             ]
+
+      # Matched against a supported list, the entry that matched is the locale.
+      assert content_language("/?locale=fr-CA",
+               from: [:query],
+               supported: ["en", "fr"],
+               content_language: true
+             ) ==
+               ["fr"]
+    end
+
+    test "names the default locale when no source has one" do
+      assert content_language("/", from: [:query], default: "de", content_language: true) == [
+               "de"
+             ]
+    end
+
+    test "is not set when no locale is set" do
+      assert content_language("/", from: [:query], default: :none, content_language: true) == []
+    end
+
+    test "init/1 refuses a value that is not a boolean" do
+      for value <- [:yes, "true", 1] do
+        assert_raise ArgumentError, ~r/:content_language must be true or false/, fn ->
+          PutLocale.init(content_language: value)
+        end
+      end
+    end
+  end
+
   describe "call/2 - a host whose locale the application does not support" do
     test "is a miss, so the next source decides" do
       # Brazil's language, Portuguese, is not a configured locale.
