@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file. This projec
 
 * `Localize.Routes.Prefix` holds the rules of a locale prefix as functions of a path: `split/2` reads it, `path/3` builds a path's address in a locale, and `target/3` decides whether a request is served or redirected. Both take a `:prefix_others` or `:prefix_all` URL mode.
 
+* `Localize.Routes.locale_prefix/2` declares a block's routes as written and under `/:locale`, so a LiveView connects, patches and navigates live between `/about` and `/fr/about`. A route with a dynamic first segment is refused at compile time.
+
 ### Changed
 
 * The select helpers for currencies, territories, locales and units sort by `Localize.Collation` in the display locale, as subdivisions did with root collation; they sorted by UTF-8 bytes, which put "Ägypten" after "Simbabwe". Tailored locales such as `ja` and `zh` sort quickly from Localize 1.10.

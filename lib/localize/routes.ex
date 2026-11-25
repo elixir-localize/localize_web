@@ -36,6 +36,10 @@ defmodule Localize.Routes do
 
   Define localized `live` routes inside `localize_live_session/3` rather than `Phoenix.LiveView.Router.live_session/3`. It puts each locale's routes into their own live session, so a live navigation to another locale is a full page load in that locale.
 
+  ### Locale prefixes
+
+  `locale_prefix/2` takes the other approach: rather than a translated route for each locale, it declares a block's routes as written and under a `/:locale` parameter, so `/about` and `/fr/about` share one route and a language added at runtime needs no new one. It needs no Gettext backend and can be imported on its own.
+
   ### Localized Helpers
 
   A `LocalizedHelpers` module is generated at compile time. Assuming the router module is called `MyApp.Router` then the full name of the localized helper module is `MyApp.Router.LocalizedHelpers`.
@@ -64,6 +68,34 @@ defmodule Localize.Routes do
     :connect,
     :live
   ]
+
+  # The route macros whose path `locale_prefix/2` checks, and those it
+  # refuses in its block because declaring them twice is an error or
+  # meaningless.
+  @prefixable_verbs [
+    :get,
+    :post,
+    :put,
+    :patch,
+    :delete,
+    :options,
+    :head,
+    :connect,
+    :trace,
+    :live,
+    :resources
+  ]
+
+  @refused_in_locale_prefix [
+    :forward,
+    :live_session,
+    :locale_prefix,
+    :localize,
+    :localize_live_session
+  ]
+
+  @locale_prefix_options [:param]
+  @param_name ~r/\A[a-z_][a-zA-Z0-9_]*\z/
 
   # Gettext locales that name no language, and so have no routes of their own.
   @meta_locales [:und, :"en-001"]
@@ -422,6 +454,213 @@ defmodule Localize.Routes do
       end
 
     {:__block__, [], live_sessions}
+  end
+
+  @doc """
+  Declares the routes of a block twice: as written, and under a locale prefix.
+
+  The block's routes are declared as written and again in a `scope "/:locale"`, so `/about` and `/fr/about` are both routes, with `"fr"` in the `"locale"` path parameter. Placed inside a `Phoenix.LiveView.Router.live_session/3`, both copies are in one live session, so a LiveView connects to either address, patches within it, and navigates live to the same page in another language. The locale is a parameter rather than a route of its own, so a language added at runtime needs no new route, and `~p"/about"` and `~p"/\#{locale}/about"` are both verified.
+
+  A router that does not `use Localize.Routes` imports the macro:
+
+      import Localize.Routes, only: [locale_prefix: 1, locale_prefix: 2]
+
+  The router decides nothing about the locale. `Localize.Plug.PutLocale` with the `:path` source, or `:path_prefix`, reads it; `Localize.Routes.Prefix.target/3` decides whether `/en/about` is redirected to `/about`; and the parameter can capture a segment that is not a locale, such as `blog` in `/blog/about`, which the application should answer with a `404`.
+
+  ### Arguments
+
+  * `options` is a keyword list of options.
+
+  * `block` is the routes to declare, in a `do` block.
+
+  ### Options
+
+  * `:param` is the name of the path parameter holding the locale. The default is `"locale"`, the parameter `Localize.Plug.PutLocale` reads by default.
+
+  ### Restrictions
+
+  Phoenix answers a request with the first route that matches it, so the prefixed copies are checked at compile time, and an `ArgumentError` is raised for:
+
+  * **A route or scope whose first segment is dynamic**, such as `/:category/:slug` or `/*path`. Its prefixed copy overlaps it: `/fr/shoes` is a category or a locale, whichever is declared first. Give the route a literal first segment, or declare it outside the block. A catch-all route, as a CMS has, needs no prefixed copy, since `/*path` already matches `/fr/about`.
+
+  * **`forward/4`**, since Phoenix forwards to a plug only once; and **`live_session/3`**, since a live session cannot be declared twice: place the block inside the live session instead. Nested `locale_prefix/2` and `localize/1` blocks are refused too.
+
+  A path that is not a literal string, such as a module attribute, is not checked.
+
+  The prefixed copies match more than the addresses they were written for, since a segment that is not a locale is still a value of the parameter. Verified routes are checked against them too, so with `/` in the block, its copy `/:locale` matches any path of one segment, and a mistyped `~p"/abuot"` is not reported. And they match addresses meant for routes declared after the block: with `/about` in the block, `/:locale/about` matches `/help/about` before a later `get "/help/about"` is reached. Declare `locale_prefix/2` blocks after the routes they could match.
+
+  ### Examples
+
+      live_session :default, on_mount: [{Localize.Plug, :put_locale}] do
+        locale_prefix do
+          live "/", HomeLive
+          live "/about", AboutLive
+          live "/products/:id", ProductLive
+        end
+      end
+
+  """
+  @doc since: "1.5.0"
+  defmacro locale_prefix(options \\ [], do: block) do
+    param = locale_prefix_param!(options)
+    check_locale_prefix_route!(block)
+
+    quote location: :keep do
+      require Phoenix.Router
+
+      unquote(block)
+
+      Phoenix.Router.scope unquote("/:" <> param) do
+        unquote(block)
+      end
+    end
+  end
+
+  defp locale_prefix_param!(options) do
+    if not Keyword.keyword?(options) do
+      raise ArgumentError,
+            "locale_prefix/2 expects its options as a keyword list, got: " <>
+              Macro.to_string(options)
+    end
+
+    case Keyword.keys(options) -- @locale_prefix_options do
+      [] ->
+        :ok
+
+      unknown ->
+        raise ArgumentError,
+              "locale_prefix/2 takes the options #{inspect(@locale_prefix_options)}, got: " <>
+                inspect(unknown)
+    end
+
+    param = Keyword.get(options, :param, "locale")
+
+    if not (is_binary(param) and Regex.match?(@param_name, param)) do
+      raise ArgumentError,
+            "locale_prefix/2 expects :param to be a parameter name such as \"locale\", got: " <>
+              Macro.to_string(param)
+    end
+
+    param
+  end
+
+  # Each route of a `locale_prefix/2` block, and each scope that does not
+  # give its routes a literal first segment, is checked for a dynamic first
+  # segment. A scope with one, such as `scope "/admin"`, gives every route
+  # in it a literal first segment, so its routes are not checked.
+  defp check_locale_prefix_route!({:__block__, _meta, expressions}) do
+    Enum.each(expressions, &check_locale_prefix_route!/1)
+  end
+
+  defp check_locale_prefix_route!({:scope, _meta, [_ | _] = arguments}) do
+    {leading, [last]} = Enum.split(arguments, -1)
+    path = scope_path(leading)
+    check_first_segment!(:scope, path)
+
+    if first_segment(path) == :none do
+      check_locale_prefix_route!(scope_block(last))
+    end
+  end
+
+  defp check_locale_prefix_route!({:match, _meta, [_verb, path | _rest]}) do
+    check_first_segment!(:match, path)
+  end
+
+  defp check_locale_prefix_route!({verb, _meta, [path | _rest]})
+       when verb in @prefixable_verbs do
+    check_first_segment!(verb, path)
+  end
+
+  defp check_locale_prefix_route!({refused, _meta, arguments})
+       when refused in @refused_in_locale_prefix and is_list(arguments) do
+    raise ArgumentError, refused_in_locale_prefix(refused)
+  end
+
+  defp check_locale_prefix_route!(_expression) do
+    :ok
+  end
+
+  defp scope_path([path | _rest]) when is_binary(path) do
+    path
+  end
+
+  defp scope_path([options | _rest]) when is_list(options) do
+    Keyword.get(options, :path, "/")
+  end
+
+  defp scope_path([]) do
+    "/"
+  end
+
+  defp scope_path(_leading) do
+    :unknown
+  end
+
+  defp scope_block(last) when is_list(last) do
+    Keyword.get(last, :do)
+  end
+
+  defp scope_block(_last) do
+    nil
+  end
+
+  defp check_first_segment!(verb, path) do
+    case first_segment(path) do
+      {:dynamic, segment} ->
+        raise ArgumentError,
+              "locale_prefix/2 cannot declare #{verb} #{inspect(path)} under a locale prefix: " <>
+                "its first segment #{segment} is dynamic, so its prefixed copy overlaps it, " <>
+                "and /fr/... would be read as either. Give it a literal first segment, " <>
+                "or declare it outside the locale_prefix block."
+
+      _literal_or_none ->
+        :ok
+    end
+  end
+
+  # `:none` for the root of a path or one that is not a literal string,
+  # which is not checked.
+  defp first_segment(path) when is_binary(path) do
+    segment =
+      path
+      |> String.split("/", trim: true)
+      |> List.first()
+
+    classify_segment(segment)
+  end
+
+  defp first_segment(_path) do
+    :unknown
+  end
+
+  defp classify_segment(nil) do
+    :none
+  end
+
+  defp classify_segment(":" <> _name = segment) do
+    {:dynamic, segment}
+  end
+
+  defp classify_segment("*" <> _name = segment) do
+    {:dynamic, segment}
+  end
+
+  defp classify_segment(_segment) do
+    :literal
+  end
+
+  defp refused_in_locale_prefix(:forward) do
+    "locale_prefix/2 cannot declare forward/4 in its block: Phoenix forwards to a plug only once. " <>
+      "Declare it outside the block."
+  end
+
+  defp refused_in_locale_prefix(:live_session) do
+    "locale_prefix/2 cannot declare a live_session in its block, which would declare it twice. " <>
+      "Place the locale_prefix block inside the live_session instead."
+  end
+
+  defp refused_in_locale_prefix(macro) do
+    "locale_prefix/2 cannot declare #{macro} in its block. Declare it outside the block."
   end
 
   @doc false

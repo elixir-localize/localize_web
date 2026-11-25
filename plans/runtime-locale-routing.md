@@ -167,8 +167,6 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ## Open questions
 
-* **Is a route with a dynamic first segment refused, or only warned about?** The overlap makes it ambiguous rather than wrong for every path. Recommended: raise, and document the alternatives.
-
 * **Is an unsupported `:locale` a `404`, or passed on with no locale?** Recommended: `404`, since the address is not one the site publishes.
 
 * **Does a `302` also carry `cache-control: private`?** `vary` already keeps a shared cache from serving one visitor's redirect to another, but some caches ignore it. Recommended: `vary` by default and a `:cache_control` option.
@@ -193,8 +191,6 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 * [ ] **`Localize.Routes.Prefix`** — `split/2`, `path/3` and `target/3`, with `:path_prefix` moved onto `split/2`, have landed. `localized_path/2` waits on the plug, which decides where a request's mode and default are kept.
 
-* [ ] **`Localize.Routes.locale_prefix/2`** — the routes of a block declared plainly and under `/:locale`, with a compile-time error for a dynamic first segment.
-
 * [ ] **`Localize.Plug.LocalePrefix`** — the two modes, the `404` for an unsupported `:locale`, the optional `:exists?`, the query string and the `vary` of a `302`.
 
 * [ ] **`Localize.Live.LocalePrefix`** — the `on_mount` and `handle_params` hook, and `Localize.Routes.Request` for its functions, with the parity test.
@@ -202,5 +198,7 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 * [ ] **A guide** — runtime locale routing beside `Localize.Routes`: when each fits, an ordinary router with `locale_prefix`, and a CMS with a catch-all route, sites, modes, alternates and a switcher built with `Localize.Routes.Prefix.path/3`.
 
 ### Done
+
+* [x] **`Localize.Routes.locale_prefix/2`** — declares a block plainly and under `/:param`; refuses a dynamic first segment, `forward`, `live_session` and nested blocks at compile time. Verified routes accept any one-segment path once `/` is in the block, and the prefixed copies can match routes declared after the block; both documented. 2026-11-25.
 
 * [x] **Try stripping the prefix with LiveView** — it does not work: LiveView refuses to connect to a stripped address and `push_patch` raises; declaring the routes under `/:locale` works. 2026-11-25.
