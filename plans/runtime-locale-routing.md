@@ -16,11 +16,11 @@ Phoenix's verified routes check a path against the router when the application c
 
 * **A translated path segment** (`/produits` for `/products`) changes the path, so it must be a route, made at compile time. `Localize.Routes` does this with Gettext, and so does [Routex](https://hex.pm/packages/routex), which also serves the default locale unprefixed and makes `~p` branch to the current locale's route. This plan does not compete with either.
 
-* **A locale prefix** wraps a path without changing it. Removed before the router, it leaves one set of routes that serves every language, so `~p"/about"` stays verified, and the prefix is added at runtime when an address is built. This is the part that can be done at runtime without giving up verified routes, and it is this plan's subject.
+* **A locale prefix** wraps a path without changing it. Declared once as a `:locale` parameter in front of the routes, it serves every language with one set of route definitions, `~p"/about"` and `~p"/#{locale}/about"` stay verified, and a language added at runtime needs no new route. This is the part that can be done at runtime without giving up verified routes, and it is this plan's subject.
 
 * **A page whose path is data**, a CMS page, has no route to verify. Its application resolves the path itself and needs the prefix rules, the redirects and the address helpers, but not the router integration.
 
-So the plan has a layer that strips the prefix for ordinary routers, a layer of rules and helpers that every application uses, and a hook for live navigation.
+So the plan has a router macro for ordinary routers, a layer of rules and helpers that every application uses, and a hook for live navigation. Removing the prefix before the router, the first idea for ordinary routers, does not work with LiveView; see "Spike: stripping the prefix" below.
 
 ## Prior art
 
@@ -66,7 +66,9 @@ Out of scope: translated path segments (`Localize.Routes`, Routex) and a page's 
 
 * **Rules and helpers only, with no router integration.** Enough for a CMS, but an ordinary router would still need a route per language for every page. Rejected as the whole answer; kept as the core.
 
-* **Strip the prefix before the router, on top of shared rules, with a hook for live navigation.** Serves both kinds of application, keeps verified routes, and puts every rule in one place. Chosen.
+* **Strip the prefix before the router, on top of shared rules, with a hook for live navigation.** One set of routes and verified routes kept, but a LiveView cannot connect to a stripped address. Rejected after the spike.
+
+* **Declare each route plain and under a `/:locale` parameter, from one definition, on top of shared rules, with a hook for live navigation.** Serves both kinds of application, works with LiveView's connect, patch and navigation, keeps verified routes, and takes languages added at runtime. Chosen.
 
 * **Leave it to applications.** Each writes the rules again, and the places it goes wrong, exact prefix matching, `301` against `302` and `vary`, are the ones a library should settle. Rejected.
 
@@ -92,14 +94,28 @@ Runs after `Localize.Plug.PutLocale`, which has resolved the locale from `:path_
 
 * Under `:prefix_all`, a locale found by any other source is redirected to the address with its prefix, with a `302`, or, when `:exists?` is given and does not hold, to the default language's address.
 
-* **`strip: true`**, for an ordinary router, removes the matched segment from `conn.path_info` after the decision, so the router matches `/fr/about` as `/about`. Without it the path is left whole, for an application that resolves its own paths. The plug then goes in the endpoint, before the router, where `strip: true` is needed, or in a pipeline, where only some routes are localized.
+* A `:locale` path parameter that names no supported locale is answered `404`, since the route captured a path that is not a localized address: `/blog/about` matches `/:locale/about` with `locale: "blog"`.
+
+The plug goes in the router's pipeline, after `PutLocale`.
+
+### `Localize.Routes.locale_prefix/2` — for an ordinary router
+
+A router macro that declares the routes in its block twice, plainly and in a `scope "/:locale"`, inside the same live session, so a navigation between languages stays live:
 
 ```elixir
-# An ordinary router: one set of routes for every language.
-plug Localize.Plug.PutLocale, from: [:path_prefix, :session, :accept_language]
-plug Localize.Plug.LocalePrefix, mode: :prefix_others, strip: true
-plug MyAppWeb.Router
+live_session :default, on_mount: [Localize.Live.LocalePrefix] do
+  locale_prefix do
+    live "/about", AboutLive
+    live "/products/:id", ProductLive
+  end
+end
+```
 
+`/about`, `/fr/about` and `/de/about` are then real routes, which LiveView can connect to, patch and navigate between, and `~p"/about"` and `~p"/#{locale}/about"` are verified. The locale is a parameter, so a language added at runtime needs no route.
+
+Phoenix matches a path once, so a route whose first segment is dynamic in the block, such as `/:category/:slug`, overlaps its prefixed copy: `/fr/shoes` is either a category or a locale, whichever is declared first. The macro raises at compile time for such a route, and the guide shows the alternatives: a literal first segment, or `Localize.Routes`' per-locale routes.
+
+```elixir
 # A CMS: languages and mode per site, paths resolved by the application.
 plug Localize.Plug.PutLocale,
   from: [:path_prefix, :session, :accept_language],
@@ -111,6 +127,8 @@ plug Localize.Plug.LocalePrefix,
   exists?: {MyApp.Pages, :published?}
 ```
 
+A CMS with one catch-all route needs no macro: `/*path` already matches `/fr/about`, so LiveView finds a route for every address, and the application resolves the path it is given.
+
 ### `Localize.Live.LocalePrefix` — on a live navigation
 
 An `on_mount` hook that attaches a `handle_params` hook. On each navigation it splits the URI with `Localize.Routes.Prefix.split/2`, puts the locale for Localize and Gettext, and calls `target/4`; a redirect becomes a `push_navigate`. It is defined only when Phoenix LiveView is loaded.
@@ -119,9 +137,39 @@ An `on_mount` hook that attaches a `handle_params` hook. On each navigation it s
 
 The options that may be functions are called with the `conn` by the plugs. A live navigation has no `conn`, so the hook calls them with a `Localize.Routes.Request` holding the host, the path, the session and the socket's assigns. A function that finds a site from the host, or from an assign set by the application's own `on_mount`, finds it the same way in both. The request form is accepted by the new plug and hook from the start; `PutLocale`'s existing `conn` functions are left as they are.
 
+## Spike: stripping the prefix
+
+Tried on 2026-11-25 with Phoenix LiveView 1.2.15, in `plans/spikes/strip_live_spike_test.exs` (kept as a record, not part of the suite; copy it into `test/` to run it).
+
+LiveView resolves every address it is given, on connect, on `push_patch` and on a navigation, with `Phoenix.LiveView.Route.live_link_info_without_checks/3`, which removes the endpoint's static `script_name` and asks the router for the rest. Nothing lets an application change the path per request, so a prefix removed by a plug before the router is never removed there.
+
+With the prefix removed before a router that has only `/about` and `/other`:
+
+* A request for `/fr/about` renders, with status 200.
+
+* The LiveView's connect is refused: `live/2` returns `{:error, {:redirect, %{to: "http://www.example.com/fr/about"}}}`, the same address, so a browser would render the page, fail to connect and reload it again.
+
+* `push_patch` to `/fr/about` raises `ArgumentError` ("cannot invoke handle_params nor navigate/patch … because it isn't defined in the router") and the LiveView exits.
+
+* `push_navigate` to `/fr/other` becomes a full page load, which then fails to connect.
+
+With each route declared plainly and under `scope "/:locale"`, in one live session:
+
+* `/fr/about` and `/about` connect, with `locale` `"fr"` and the default.
+
+* `push_patch` to `/fr/about?page=2` stays in the LiveView, and `push_navigate` to `/de/other` or back to `/about` is a live navigation.
+
+* `~p"/about"` and `~p"/#{locale}/about"` compile without warnings; `~p"/nowhere"` still warns.
+
+* `/blog/about` matches the prefixed route with `locale: "blog"`, so the parameter must be checked.
+
+Removing the prefix would need LiveView to accept a per-request path rewrite, which is a change for Phoenix LiveView, not for this library. The plan declares the prefix in the router instead.
+
 ## Open questions
 
-* **Does a stripped prefix survive a live navigation?** LiveView matches a `navigate` against the router by the URI's path, which keeps the prefix. With `strip: true`, `/fr/about` has no route of its own. The hook, or a router helper that declares the stripped paths, must make LiveView match `/about` for it. This decides whether `strip: true` works with LiveView, and is the first thing to try.
+* **Is a route with a dynamic first segment refused, or only warned about?** The overlap makes it ambiguous rather than wrong for every path. Recommended: raise, and document the alternatives.
+
+* **Is an unsupported `:locale` a `404`, or passed on with no locale?** Recommended: `404`, since the address is not one the site publishes.
 
 * **Does a `302` also carry `cache-control: private`?** `vary` already keeps a shared cache from serving one visitor's redirect to another, but some caches ignore it. Recommended: `vary` by default and a `:cache_control` option.
 
@@ -133,9 +181,9 @@ The options that may be functions are called with the `conn` by the plugs. A liv
 
 * **A matrix of the rules:** both modes × the default prefix, another prefix, no prefix and a first segment that is not a locale × a remembered locale, an `accept-language` header and neither × `:exists?` absent, true and false × a query string.
 
-* **An ordinary router with `strip: true`:** one route set answers `/about` and `/fr/about`, `~p` paths stay verified, and `localized_path/2` gives each language's address.
+* **An ordinary router with `locale_prefix`:** one block answers `/about` and `/fr/about`, a LiveView connects, patches and navigates between languages, `~p` paths stay verified, an unsupported `:locale` is a `404`, and a dynamic first segment is refused at compile time.
 
-* **Parity between the plug and the hook:** the same inputs through `Localize.Plug.LocalePrefix` and `Localize.Live.LocalePrefix` give the same decision, in a live session that navigates between languages, with and without `strip: true`.
+* **Parity between the plug and the hook:** the same inputs through `Localize.Plug.LocalePrefix` and `Localize.Live.LocalePrefix` give the same decision, in a live session that navigates between languages, with `locale_prefix` and with a catch-all route.
 
 * **Functions of the request:** a `:supported` function that reads the host or an assign gives the same list from a `conn` and from a socket.
 
@@ -143,12 +191,16 @@ The options that may be functions are called with the `conn` by the plugs. A liv
 
 ## Tasks
 
-* [ ] **Try `strip: true` with LiveView** — whether a live navigation to a stripped path can be matched, and how; the answer shapes the rest.
-
 * [ ] **`Localize.Routes.Prefix`** — `split/2`, `path/3` and `target/4`, with `:path_prefix` moved onto `split/2`, and `localized_path/2`.
 
-* [ ] **`Localize.Plug.LocalePrefix`** — the two modes, `strip:`, the optional `:exists?`, the query string and the `vary` of a `302`.
+* [ ] **`Localize.Routes.locale_prefix/2`** — the routes of a block declared plainly and under `/:locale`, with a compile-time error for a dynamic first segment.
+
+* [ ] **`Localize.Plug.LocalePrefix`** — the two modes, the `404` for an unsupported `:locale`, the optional `:exists?`, the query string and the `vary` of a `302`.
 
 * [ ] **`Localize.Live.LocalePrefix`** — the `on_mount` and `handle_params` hook, and `Localize.Routes.Request` for its functions, with the parity test.
 
-* [ ] **A guide** — runtime locale routing beside `Localize.Routes`: when each fits, an ordinary router with `strip: true`, and a CMS with sites, modes, alternates and a switcher built with `Localize.Routes.Prefix.path/3`.
+* [ ] **A guide** — runtime locale routing beside `Localize.Routes`: when each fits, an ordinary router with `locale_prefix`, and a CMS with a catch-all route, sites, modes, alternates and a switcher built with `Localize.Routes.Prefix.path/3`.
+
+### Done
+
+* [x] **Try stripping the prefix with LiveView** — it does not work: LiveView refuses to connect to a stripped address and `push_patch` raises; declaring the routes under `/:locale` works. 2026-11-25.
