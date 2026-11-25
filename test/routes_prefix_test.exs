@@ -1,6 +1,8 @@
 defmodule Localize.Routes.PrefixTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias Localize.Routes.Prefix
 
   doctest Localize.Routes.Prefix
@@ -246,6 +248,97 @@ defmodule Localize.Routes.PrefixTest do
       end
 
       assert {:error, %{__exception__: true}} = Prefix.target("/about", :fr, %{})
+    end
+  end
+
+  describe "localized_path/3" do
+    @settings %{mode: :prefix_others, default: "en", supported: ["en", "fr", "de"]}
+
+    defp prefixed_conn(path, setup \\ []) do
+      :get
+      |> Plug.Test.conn(path)
+      |> Map.merge(Keyword.get(setup, :conn, %{}))
+      |> Plug.Test.init_test_session(%{})
+      |> Localize.Plug.PutLocale.call(
+        Localize.Plug.PutLocale.init(
+          from: [:path_prefix],
+          supported: ["en", "fr", "de"],
+          default: "en"
+        )
+      )
+      |> Localize.Plug.LocalePrefix.call(
+        Localize.Plug.LocalePrefix.init(Keyword.get(setup, :prefix, []))
+      )
+    end
+
+    defp logged(function) do
+      log = capture_log(fn -> send(self(), {:result, function.()}) end)
+      assert_received {:result, result}
+      {result, log}
+    end
+
+    test "gives the address in the current locale, or the one given, by a map of settings" do
+      {:ok, _locale} = Localize.put_locale(:fr)
+
+      assert Prefix.localized_path(@settings, "/about") == "/fr/about"
+      assert Prefix.localized_path(@settings, "/about", :en) == "/about"
+
+      assert Prefix.localized_path(@settings, "/de/about?page=2#top", "fr-CA") ==
+               "/fr/about?page=2#top"
+
+      assert Prefix.localized_path(%{@settings | mode: :prefix_all}, "/about", :en) == "/en/about"
+    end
+
+    test "takes the settings and the locale of a request LocalePrefix has run on" do
+      conn = prefixed_conn("/fr/contact")
+      {:ok, _locale} = Localize.put_locale(:de)
+
+      assert Prefix.localized_path(conn, "/about") == "/fr/about"
+      assert Prefix.localized_path(conn, "/fr/about", :en) == "/about"
+
+      conn = prefixed_conn("/de/contact", prefix: [mode: :prefix_all])
+      assert Prefix.localized_path(conn, "/about", :en) == "/en/about"
+    end
+
+    test "keeps the script name of a mounted application in front of the prefix" do
+      conn = prefixed_conn("/fr/contact", conn: %{script_name: ["app"]})
+
+      assert Prefix.localized_path(conn, "/app/about") == "/app/fr/about"
+      assert Prefix.localized_path(conn, "/app") == "/app/fr"
+      assert Prefix.localized_path(conn, "/app?page=2") == "/app/fr?page=2"
+      assert Prefix.localized_path(conn, "/app/fr/about", :en) == "/app/about"
+      assert Prefix.localized_path(conn, "/apple") == "/fr/apple"
+      assert Prefix.localized_path(conn, "/about") == "/fr/about"
+    end
+
+    test "takes the settings a live hook put on a socket" do
+      socket = %Phoenix.LiveView.Socket{private: %{localize_locale_prefix: @settings}}
+
+      assert Prefix.localized_path(socket, "/about", :de) == "/de/about"
+    end
+
+    test "logs and returns the path as it is when it cannot localize it" do
+      for {source, path, locale} <- [
+            {Plug.Test.conn(:get, "/about"), "/about", :fr},
+            {%Phoenix.LiveView.Socket{}, "/about", :fr},
+            {@settings, "/about", :pt},
+            {@settings, "about", :fr},
+            {%{@settings | mode: :prefix_some}, "/about", :fr},
+            {42, "/about", :fr},
+            {%URI{}, "/about", :fr}
+          ] do
+        {result, log} = logged(fn -> Prefix.localized_path(source, path, locale) end)
+
+        assert result == path, inspect({source, path, locale})
+        assert log =~ "Localize.Routes.Prefix.localized_path/3"
+      end
+    end
+
+    test "logs and returns an empty string for a path that is not a string" do
+      for path <- [nil, 42, ~c"/about"] do
+        assert {"", log} = logged(fn -> Prefix.localized_path(@settings, path) end)
+        assert log =~ "is not a path"
+      end
     end
   end
 end

@@ -84,7 +84,7 @@ Functions of a path with no `conn`, used by every layer:
 
 * **`target(path, locale, options)`** returns `{:serve, locale}` or `{:redirect, path, 301 | 302}` under `:mode` and `:default`, with an optional `:exists?` test. The decision comes from the path: a prefixed path is served in the locale it names, or redirected with a `301` when that is the default under `:prefix_others`, and an unprefixed path is served in the default locale under `:prefix_others`, or redirected with a `302` to the visitor's `locale` under `:prefix_all`. The source of the visitor's locale is not needed for the decision, only for the `vary` of a `302`, which is the plug's. `:exists?` is called with the path without its prefix and the locale.
 
-A `~P` sigil or a `localized_path/2` helper composes a verified route with `path/3`, so `~p"/about"` is checked at compile time and given the current locale's prefix at runtime. It is built with the plug, which decides where the mode and default of a request are kept for it to read.
+`localized_path/3` composes a verified route with `path/3`, so `~p"/about"` is checked at compile time and given the current locale's prefix at runtime: `localized_path(@conn, ~p"/about")`. It reads the settings `Localize.Plug.LocalePrefix` resolved for the request, or those the live hook puts on the socket, so a site whose settings are functions of the request repeats none of them, and a third argument gives the address in another locale.
 
 ### `Localize.Plug.LocalePrefix` — on a request
 
@@ -171,7 +171,7 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 * **Does the hook push a redirect, or hand the decision to the LiveView?** Recommended: push it, with an option to receive the decision instead.
 
-* **Is `~P` worth a sigil, or is `localized_path/2` enough?** A sigil reads well in templates but adds to Routex's and `Localize.VerifiedRoutes`'s `~q`. Recommended: the function first.
+* **Is a `~P` sigil worth adding over `localized_path/3`?** A sigil reads well in templates but adds to Routex's and `Localize.VerifiedRoutes`'s `~q`. The function has landed; a sigil waits for demand.
 
 ## Testing
 
@@ -187,13 +187,13 @@ Removing the prefix would need LiveView to accept a per-request path rewrite, wh
 
 ## Tasks
 
-* [ ] **`Localize.Routes.Prefix`** — `split/2`, `path/3` and `target/3`, with `:path_prefix` moved onto `split/2`, have landed. `localized_path/2` remains: the plug keeps a request's mode, default and supported locales in `conn.private`, read by `Localize.Plug.LocalePrefix.get_settings/1`, and the live hook will keep them in the socket.
-
 * [ ] **`Localize.Live.LocalePrefix`** — the `on_mount` and `handle_params` hook, and `Localize.Routes.Request` for its functions, with the parity test.
 
 * [ ] **A guide** — runtime locale routing beside `Localize.Routes`: when each fits, an ordinary router with `locale_prefix`, and a CMS with a catch-all route, sites, modes, alternates and a switcher built with `Localize.Routes.Prefix.path/3`.
 
 ### Done
+
+* [x] **`Localize.Routes.Prefix`** — `split/2`, `path/3`, `target/3` and `localized_path/3`, with `:path_prefix` moved onto `split/2`. `localized_path/3` reads the settings `Localize.Plug.LocalePrefix` resolved (a conn), the live hook's (a socket's `:localize_locale_prefix` private key) or a map, keeps a script name in front of the prefix, and logs and returns the path when it cannot localize it. 2026-11-25.
 
 * [x] **`Localize.Plug.LocalePrefix`** — both modes, a `404` (a `NotFoundError` with `plug_status: 404`) for an unsupported locale parameter, `:exists?`, the query string and the script name kept, redirects for `GET` and `HEAD` only; `PutLocale` keeps its settings in `conn.private` for it, and its `vary` serves the `302`. 2026-11-25.
 

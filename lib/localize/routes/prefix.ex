@@ -10,6 +10,8 @@ defmodule Localize.Routes.Prefix do
 
   * `target/3` decides whether a request for a path is served, and in which locale, or redirected.
 
+  * `localized_path/3` gives a path's address in the current locale, or another, by the settings `Localize.Plug.LocalePrefix` resolved for the request, for links in templates: `localized_path(@conn, ~p"/about")`.
+
   ### Prefixes
 
   A first segment is a prefix only when it names a supported locale exactly, ignoring case and taking `_` for `-`: `/fr/about` and `/zh-hant/about` name `fr` and `zh-Hant`, while `/fr-ca/about` is not French where only `fr` is supported, and a page slug is never read as a language by closeness. A prefix is written as the supported locale it names, in lower case: `zh-Hant` is written `/zh-hant`.
@@ -23,6 +25,8 @@ defmodule Localize.Routes.Prefix do
   """
 
   alias Localize.AcceptLanguage
+
+  require Logger
 
   @modes [:prefix_others, :prefix_all]
   @default_mode :prefix_others
@@ -40,6 +44,11 @@ defmodule Localize.Routes.Prefix do
           (String.t(), Localize.LanguageTag.t() -> boolean())
           | {module(), atom()}
           | {module(), atom(), list()}
+
+  @typedoc """
+  Where `localized_path/3` finds the URL mode, the default locale and the supported locales: a `t:Plug.Conn.t/0` that `Localize.Plug.LocalePrefix` has run on, a LiveView socket the live hook has run on, or a map with `:mode`, `:default` and `:supported`, as `Localize.Plug.LocalePrefix.get_settings/1` returns it.
+  """
+  @type settings_source :: Plug.Conn.t() | struct() | map()
 
   @typedoc "What `target/3` decides for a request."
   @type target :: {:serve, Localize.LanguageTag.t()} | {:redirect, String.t(), 301 | 302}
@@ -230,6 +239,174 @@ defmodule Localize.Routes.Prefix do
   def target(_path, _locale, options) do
     {:error,
      Localize.InvalidValueError.exception(value: options, expected: "a keyword list of options")}
+  end
+
+  @doc """
+  Returns a path's address in a locale, by the settings resolved for a request.
+
+  It composes a verified route with `path/3`, so `~p"/about"` is checked at compile time and given the locale's prefix at runtime. The URL mode, the default locale and the supported locales are those `Localize.Plug.LocalePrefix` resolved for the request, so a site whose settings are functions of the request needs none of them here. A path that begins with the request's script name, as a verified route in a mounted application does, keeps it in front of the prefix: `/app/about` in French is `/app/fr/about`.
+
+  It is meant for templates, so it returns a string: a path it cannot localize is logged and returned as it is, which under either mode is still an address the plug answers. `path/3` returns `{:error, exception}` instead.
+
+  ### Arguments
+
+  * `source` is a `t:Plug.Conn.t/0` that `Localize.Plug.LocalePrefix` has run on, a LiveView socket the live hook has run on, or a map with `:mode`, `:default` and `:supported`.
+
+  * `path` is a path beginning with `/`, with or without a locale prefix, such as a verified route.
+
+  * `locale` is the locale of the address. The default is the request's locale: the one `Localize.Plug.PutLocale` set on a `conn`, and otherwise `Localize.get_locale/0`.
+
+  ### Returns
+
+  * The address, or `path` unchanged when it cannot be localized, or `""` when `path` is not a string.
+
+  ### Examples
+
+      iex> settings = %{mode: :prefix_others, default: "en", supported: ["en", "fr"]}
+      iex> Localize.Routes.Prefix.localized_path(settings, "/about?page=2", :fr)
+      "/fr/about?page=2"
+      iex> Localize.Routes.Prefix.localized_path(settings, "/fr/about", :en)
+      "/about"
+
+  """
+  @spec localized_path(settings_source(), String.t(), locale() | nil) :: String.t()
+  def localized_path(source, path, locale \\ nil)
+
+  def localized_path(source, path, locale) when is_binary(path) do
+    case build_localized_path(source, path, locale) do
+      {:ok, localized} ->
+        localized
+
+      {:error, exception} ->
+        Logger.warning(
+          "Localize.Routes.Prefix.localized_path/3: #{Exception.message(exception)}. " <>
+            "#{inspect(path)} is returned as it is."
+        )
+
+        path
+    end
+  end
+
+  def localized_path(_source, path, _locale) do
+    Logger.warning(
+      "Localize.Routes.Prefix.localized_path/3: #{inspect(path)} is not a path. \"\" is returned."
+    )
+
+    ""
+  end
+
+  defp build_localized_path(source, path, locale) do
+    with {:ok, settings} <- source_settings(source) do
+      {script, relative} = split_script(path, script_prefix(source))
+
+      options = [
+        mode: Map.get(settings, :mode, @default_mode),
+        default: Map.get(settings, :default, Localize.default_locale()),
+        supported: Map.get(settings, :supported)
+      ]
+
+      with {:ok, localized} <- path(relative, locale || source_locale(source), options) do
+        {:ok, script <> localized}
+      end
+    end
+  end
+
+  defp source_settings(%Plug.Conn{} = conn) do
+    conn
+    |> Localize.Plug.LocalePrefix.get_settings()
+    |> settings_found()
+  end
+
+  defp source_settings(%{__struct__: Phoenix.LiveView.Socket, private: private}) do
+    private
+    |> Map.get(:localize_locale_prefix)
+    |> settings_found()
+  end
+
+  defp source_settings(%{__struct__: _struct} = source) do
+    {:error, invalid_source(source)}
+  end
+
+  defp source_settings(%{} = settings) do
+    {:ok, settings}
+  end
+
+  defp source_settings(source) do
+    {:error, invalid_source(source)}
+  end
+
+  defp invalid_source(source) do
+    Localize.InvalidValueError.exception(
+      value: source,
+      expected: "a Plug.Conn, a LiveView socket or a map of settings"
+    )
+  end
+
+  defp settings_found(nil) do
+    {:error,
+     Localize.InvalidValueError.exception(
+       value: nil,
+       expected:
+         "the settings of Localize.Plug.LocalePrefix or the live hook, which has not run for this request"
+     )}
+  end
+
+  defp settings_found(settings) do
+    {:ok, settings}
+  end
+
+  defp source_locale(%Plug.Conn{} = conn) do
+    Localize.Plug.PutLocale.get_locale(conn) || Localize.get_locale()
+  end
+
+  defp source_locale(_source) do
+    Localize.get_locale()
+  end
+
+  # The script name a verified route puts in front of a path in a mounted
+  # application.
+  defp script_prefix(%Plug.Conn{script_name: script_name}) do
+    Enum.map_join(script_name, &("/" <> &1))
+  end
+
+  defp script_prefix(%{__struct__: Phoenix.LiveView.Socket, endpoint: endpoint})
+       when is_atom(endpoint) and not is_nil(endpoint) do
+    if Code.ensure_loaded?(endpoint) and function_exported?(endpoint, :script_name, 0) do
+      Enum.map_join(endpoint.script_name(), &("/" <> &1))
+    else
+      ""
+    end
+  end
+
+  defp script_prefix(_source) do
+    ""
+  end
+
+  # A path that begins with the script name keeps it in front; any other is
+  # localized as it is.
+  defp split_script(path, "") do
+    {"", path}
+  end
+
+  defp split_script(script, script) do
+    {script, "/"}
+  end
+
+  defp split_script(path, script) do
+    if String.starts_with?(path, script) do
+      rest = binary_part(path, byte_size(script), byte_size(path) - byte_size(script))
+      split_script_rest(path, script, rest)
+    else
+      {"", path}
+    end
+  end
+
+  defp split_script_rest(path, script, rest) do
+    if String.starts_with?(rest, ["/", "?", "#"]) do
+      {script, absolute(rest)}
+    else
+      {"", path}
+    end
   end
 
   defp decide(:prefix_others, nil, context) do
