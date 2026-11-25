@@ -20,6 +20,8 @@ Phoenix integration for the [Localize](https://hex.pm/packages/localize) library
 
 * **[Document Language and Direction](https://hexdocs.pm/localize_web/http-locale-discovery.html#the-document-s-language-and-direction)** — render `<html lang dir>` for the page's locale, right to left for Arabic or Persian from CLDR script data, and keep it current across live navigation.
 
+* **[Language Switcher](https://hexdocs.pm/localize_web/localized-html-helpers.html#language-switcher)** — links to the page in each of its languages, each named in itself and cased for a menu, with `lang`, `dir` and `aria-current`, from the same map of locale to URL as the hreflang annotations.
+
 * **[hreflang Annotations](https://hexdocs.pm/localize_web/phoenix-localized-routing.html#generating-hreflang-links)** — render validated `rel="alternate"` `hreflang` link sets from the generated route helpers, from verified routes, or from any map of locale to URL.
 
 * **[HTML Form Helpers](https://hexdocs.pm/localize_web/localized-html-helpers.html)** — generate `<select>` tags and option lists for currencies, territories, territory subdivisions, locales, units of measure, and months with localized display names.

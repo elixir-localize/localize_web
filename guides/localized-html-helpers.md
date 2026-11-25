@@ -313,6 +313,28 @@ iex> Localize.HTML.Month.select(:my_form, :month, style: :narrow)
 iex> Localize.HTML.Month.month_options(style: :abbreviated, locale: "de")
 ```
 
+## Language Switcher
+
+`Localize.HTML.LanguageSwitcher.language_switcher/1` renders links to the same page in each of its languages. It takes the map of locale to URL that `Localize.HTML.Hreflang.links/2` takes, so a page that declares its alternates for search engines offers them to readers from the same data:
+
+```heex
+<Localize.HTML.LanguageSwitcher.language_switcher
+  urls={@alternates}
+  current={@locale}
+  label="Language"
+/>
+```
+
+Each language is named in itself and cased for a menu, "Français", "العربية", "日本語", so a reader finds their own language whatever the page is in. Each link carries `hreflang`, `lang` and `dir`, so a screen reader reads it in the right voice and Arabic or Persian runs right to left, and the current language carries `aria-current="page"`. The current language is found as `Localize.Plug.PutLocale` matches a locale, so a page in `fr-CA` marks `fr`. The names come from each locale's own data, so the languages should be locales Localize is configured for. The key `"x-default"` is left out.
+
+`navigate` links with a live navigation, for a live session that serves every language. An application with markup of its own, flags or a dropdown, takes the entries from `Localize.HTML.LanguageSwitcher.links/2`:
+
+```elixir
+iex> {:ok, entries} = Localize.HTML.LanguageSwitcher.links(%{"en" => "/en", "fr" => "/fr"}, current: :fr)
+iex> Enum.map(entries, &{&1.name, &1.lang, &1.current?})
+[{"English", "en", false}, {"Français", "fr", true}]
+```
+
 ## Customizing Display with Mapper and Collator
 
 All select helpers accept `:mapper` and `:collator` options for full control over display text and sort order. The default collators sort names with `Localize.Collation` in the locale they are displayed in, so accented and non-Latin names appear where a reader of that language expects them rather than in byte order, where every accented capital followed Z.

@@ -4,8 +4,6 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## Open
 
-* [ ] **A language switcher** — links built from the locale to URL map `Localize.HTML.Hreflang.links/2` takes, each name in its own language with `lang` and `dir`, and `aria-current` on the current one. Needs `Localize.Locale.direction/1`.
-
 * [ ] **A `content-language` response header** — `PutLocale` sets none for the locale it resolved. Low value: search engines mostly ignore it.
 
 * [ ] **Warn when two Gettext locales collapse into one locale id** — `de` and `de_CH` both resolve to `de-CH` when only `de-CH` is supported, so they share one route tag and the routes and helpers can translate with different Gettext locales. `Localize.Routes.locales_from_gettext/1` should warn at compile time when a backend's locales collapse. Raised in #27.
@@ -15,6 +13,8 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 * [ ] **Store only a chosen locale by default** — `Localize.Plug.PutSession` stores a locale from any source unless given `:from`, so an application gets the first-visit cookie until it opts out. Parked for 2.0: the new default breaks a LiveView in a live session that has not been given `Localize.Plug.live_session_locale/1`.
 
 ## Done
+
+* [x] **A language switcher** — `Localize.HTML.LanguageSwitcher.links/2` and `language_switcher/1` from the hreflang map: names in their own language cased for a menu (`capitalization: :ui_list_or_menu`, localize 1.10), `lang`/`dir`, `aria-current`, current matched as the plugs match, collated in the current locale. 2026-11-25, unreleased (1.5.0).
 
 * [x] **`lang` and `dir` for the document** — `Localize.HTML.Document.attributes/1`, `html/1` for the root layout and `live_locale/1`, which sets `<html lang dir>` with `Phoenix.LiveView.JS` when a page in another locale mounts in the same live session. Direction from `Localize.Locale.direction/1`. 2026-11-25, unreleased (1.5.0).
 

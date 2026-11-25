@@ -22,6 +22,8 @@ defmodule Localize.HTML do
 
   * The `lang` and `dir` of a page's `<html>` element, kept current across live navigation — see `Localize.HTML.Document`.
 
+  * A language switcher, each language named in itself — see `Localize.HTML.LanguageSwitcher`.
+
   * `t/1`, `t/2` — compile-time MF2 translation macro for HEEx templates.
     Combines Gettext lookup with MF2 interpolation and markup rendering
     in one call: `{t("Hello, \#{@user.name}!")}`.

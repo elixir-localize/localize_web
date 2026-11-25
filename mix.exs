@@ -100,6 +100,7 @@ defmodule LocalizeWeb.MixProject do
           Localize.HTML.Message,
           Localize.HTML.Hreflang,
           Localize.HTML.Document,
+          Localize.HTML.LanguageSwitcher,
           Localize.RelativeUrlError
         ]
       ],
