@@ -120,9 +120,6 @@ defmodule Localize.Plug.PutLocale do
 
   @language_header "accept-language"
 
-  # The language subtags that name the root locale.
-  @root_languages ["und", "root"]
-
   # A country-code TLD is always exactly two ASCII letters. Every generic TLD
   # is longer, so a length test excludes all of them at once and keeps doing
   # so as new ones are created — more durable than a list, and necessary:
@@ -666,16 +663,9 @@ defmodule Localize.Plug.PutLocale do
   # that is too distant from all of them, such as `pt` where only `en` and
   # `fr` are supported. Both are right for formatting and neither is what
   # the visitor asked for, so they are misses and the next source is tried.
-  # The root locale is kept when it is what was asked for.
+  # The root locale is kept when it is what was asked for, as
+  # `Localize.LanguageTag.best_match/3` matches a root only to the root.
   defp validate_locale_param(locale, nil) do
-    if root_requested?(locale) do
-      Localize.validate_locale(locale)
-    else
-      supported_locale(locale)
-    end
-  end
-
-  defp supported_locale(locale) do
     with {:ok, tag} <- Localize.validate_locale(locale) do
       supported_match(tag, locale)
     end
@@ -697,32 +687,6 @@ defmodule Localize.Plug.PutLocale do
 
   defp supported_match(tag, _locale) do
     Localize.AcceptLanguage.supported_match(tag, nil)
-  end
-
-  # Whether an identifier names the root locale: its language subtag is
-  # `und`, or CLDR's `root`, whatever extensions follow.
-  defp root_requested?(requested) when is_binary(requested) do
-    language =
-      requested
-      |> String.split(["-", "_"], parts: 2)
-      |> List.first()
-      |> String.downcase()
-
-    language in @root_languages
-  end
-
-  defp root_requested?(requested) when is_atom(requested) do
-    root_requested?(Atom.to_string(requested))
-  end
-
-  # A tag that was parsed and not yet validated carries its language as
-  # it was written.
-  defp root_requested?(%Localize.LanguageTag{language: language}) do
-    root_requested?(language)
-  end
-
-  defp root_requested?(_requested) do
-    false
   end
 
   defp validate_from(options, nil), do: Keyword.put(options, :from, @default_from)

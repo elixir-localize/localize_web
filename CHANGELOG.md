@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — Unreleased
+
+### Changed
+
+* `Localize.AcceptLanguage` and `Localize.Plug.PutLocale` accept a locale by Localize's own threshold, `Localize.LanguageTag.default_distance/0`, as `Localize.validate_locale/1` and ICU do, where they took any match within 79: a locale in another script, such as `zh-TW` against `zh-Hans`, is no longer a match. Requires `localize ~> 1.11`.
+
 ## [1.5.0] — 2026-11-26
 
 ### Added

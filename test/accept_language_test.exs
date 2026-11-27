@@ -373,6 +373,41 @@ defmodule Localize.AcceptLanguageTest do
                AcceptLanguage.best_match("und", supported: ["en", "fr"])
     end
 
+    # The threshold is Localize's own, `Localize.LanguageTag.default_distance/0`,
+    # by which `Localize.validate_locale/1` negotiates: another script is not
+    # a match, while CLDR's close pairs and regional variants are.
+    test "does not match an entry in another script" do
+      for {header, supported} <- [{"zh-TW", ["zh-Hans"]}, {"az-Cyrl", ["az"]}] do
+        assert {:error, %Localize.UnknownLocaleError{}} =
+                 AcceptLanguage.best_match(header, supported: supported),
+               header
+      end
+
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :en}} =
+               AcceptLanguage.best_match("zh-TW,en;q=0.5", supported: ["zh-Hans", "en"])
+    end
+
+    test "matches CLDR's close pairs and regional variants" do
+      for {header, supported, entry} <- [
+            {"sr-Latn", ["sr", "en"], "sr"},
+            {"no", ["nb", "en"], "nb"},
+            {"pt-BR", ["pt-PT", "en"], "pt-PT"},
+            {"en-US", ["en-GB", "fr"], "en-GB"}
+          ] do
+        assert {header, AcceptLanguage.supported_entry(header, supported)} ==
+                 {header, {:ok, entry}}
+      end
+    end
+
+    test "matches a validated root only to the root" do
+      {:ok, root} = Localize.validate_locale("und")
+
+      assert {:error, _no_match} = AcceptLanguage.supported_match(root, ["en", "fr"])
+
+      assert {:ok, %Localize.LanguageTag{cldr_locale_id: :und}} =
+               AcceptLanguage.supported_match(root, nil)
+    end
+
     test "matches only the entries, not every configured locale" do
       assert {:ok, %Localize.LanguageTag{cldr_locale_id: :fr}} = AcceptLanguage.best_match("fr")
 

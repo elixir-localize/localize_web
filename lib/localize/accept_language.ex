@@ -6,14 +6,6 @@ defmodule Localize.AcceptLanguage do
 
   """
 
-  # `Localize.validate_locale/1` never rejects a valid tag: with no close
-  # supported locale it falls back to the first one (`ja` resolves to
-  # `de-CH` data when only `de-CH` and `en-CH` are supported). A distance
-  # of 80 means unrelated languages, so a match within 79 keeps every
-  # CLDR match (`en-US` to `en-CH`, `gsw` to `de-CH`) and skips the
-  # fallback.
-  @max_match_distance 79
-
   @doc """
   Tokenizes an `Accept-Language` header string into a list of
   `{quality, language_tag_string}` tuples sorted by quality descending.
@@ -182,11 +174,15 @@ defmodule Localize.AcceptLanguage do
     end
   end
 
-  # A tag's supported locale, when it matches one within
-  # `@max_match_distance`.
+  # A tag's supported locale, when it matches one: within
+  # `Localize.LanguageTag.default_distance/0`, the threshold
+  # `Localize.validate_locale/1` negotiates by, so a match here is a match
+  # there.
   #
   # With no list of supported locales, the tag is matched against the
-  # locale Localize resolved it to among the configured ones. When CLDR
+  # locale Localize resolved it to among the configured ones. Localize
+  # resolves a tag that matches none to the default locale, which is beyond
+  # the threshold, so the test tells a match from that fallback. When CLDR
   # matches across languages, the supported locale is returned, so its
   # language is the one being served.
   #
@@ -204,10 +200,10 @@ defmodule Localize.AcceptLanguage do
            Localize.LanguageTag.best_match(
              requested,
              [requested.cldr_locale_id],
-             @max_match_distance
+             Localize.LanguageTag.default_distance()
            ),
          {:ok, served} <- Localize.validate_locale(locale_id) do
-      {:ok, if(served.language == requested.language, do: requested, else: served)}
+      {:ok, presented_locale(requested, served)}
     end
   end
 
@@ -227,24 +223,17 @@ defmodule Localize.AcceptLanguage do
     end
   end
 
-  # The tag is matched by its canonical identifier: validation fills in the
-  # likely subtags, and the root locale's are `en-Latn-US`, so the tag
-  # itself would match `und` as English. `Localize.LanguageTag.best_match/3`
-  # answers a desired root locale with the first entry at a distance of 80
-  # whatever the threshold, so the distance is tested again here.
+  # A distance given to `Localize.LanguageTag.best_match/3` is strict, the
+  # root locale included, so a tag with no supported locale within it is an
+  # error rather than the first entry.
   defp closest_supported(requested, supported) do
-    desired = requested.canonical_locale_id || requested
-
-    case Localize.LanguageTag.best_match(desired, supported, @max_match_distance) do
-      {:ok, entry, distance} when distance <= @max_match_distance ->
+    case Localize.LanguageTag.best_match(
+           requested,
+           supported,
+           Localize.LanguageTag.default_distance()
+         ) do
+      {:ok, entry, _distance} ->
         {:ok, entry}
-
-      {:ok, _entry, _distance} ->
-        {:error,
-         Localize.LocaleMatchError.exception(
-           desired: requested.requested_locale_id,
-           threshold: @max_match_distance
-         )}
 
       {:error, _no_match} = error ->
         error
@@ -259,6 +248,17 @@ defmodule Localize.AcceptLanguage do
 
   defp served_locale(entry) do
     Localize.validate_locale(entry)
+  end
+
+  # The request as asked for, `en-US` served by `en`, unless the match
+  # crossed languages, `gsw-CH` served by `de`, when the served locale is
+  # presented so that its language is the one the page is in.
+  defp presented_locale(requested, served) do
+    if served.language == requested.language do
+      requested
+    else
+      served
+    end
   end
 
   # `Enum.find_value/3` takes any value but `nil` or `false` as found, so a
