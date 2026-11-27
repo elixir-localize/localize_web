@@ -98,7 +98,7 @@ A locale in the URL is an explicit choice, so it wins over the session and the b
 
 The first source that yields a valid locale wins. Remaining sources are not consulted.
 
-A source yields a locale only when what it holds matches a locale the application supports. An identifier that is valid and matches none is passed over, and the next source is consulted: `?locale=pt` where Portuguese is not supported, or `?locale=tlh`, a language CLDR has no data for. `Localize.validate_locale/1` would answer for both, with the first supported locale and with the root locale `und`, which are right for formatting and are not what the visitor asked for. The root locale is taken when it is asked for by name, as `und`. The locale of a host's territory is tested the same way, so `example.br` yields nothing where Portuguese is not supported.
+A source yields a locale only when what it holds matches a locale the application supports. An identifier that is valid and matches none is passed over, and the next source is consulted: `?locale=pt` where Portuguese is not supported, or `?locale=tlh`, a language CLDR has no data for. `Localize.validate_locale/1` would answer both with the default locale, which is right for formatting and is not what the visitor asked for. The root locale is taken when it is asked for by name, as `und`. The locale of a host's territory is tested the same way, so `example.br` yields nothing where Portuguese is not supported.
 
 ### Locales known only at runtime
 

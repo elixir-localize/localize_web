@@ -39,7 +39,7 @@ Add `localize_web` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:localize_web, "~> 1.5"}
+    {:localize_web, "~> 1.6"}
   ]
 end
 ```
@@ -140,4 +140,4 @@ Full documentation is available on [HexDocs](https://hexdocs.pm/localize_web).
 
 ## License
 
-Localize Web is released under the Apache License 2.0; see [LICENSE.md](https://github.com/elixir-localize/localize_web/blob/v1.5.0/LICENSE.md).
+Localize Web is released under the Apache License 2.0; see [LICENSE.md](https://github.com/elixir-localize/localize_web/blob/v1.6.0/LICENSE.md).
