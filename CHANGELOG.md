@@ -4,9 +4,17 @@ All notable changes to this project will be documented in this file. This projec
 
 ## [1.6.0] — 2026-11-28
 
+### Added
+
+* `path_for/3`, `url_for/3` and `hreflang_links/2` in `Localize.VerifiedRoutes` take `:locales`, the list a route is declared for with `localize [:en, :fr]`; any other locale gets the default locale's route.
+
 ### Changed
 
 * `Localize.AcceptLanguage` and `Localize.Plug.PutLocale` accept a locale by Localize's own threshold, `Localize.LanguageTag.default_distance/0`, as `Localize.validate_locale/1` and ICU do, where they took any match within 79: a locale in another script, such as `zh-TW` against `zh-Hans`, is no longer a match. Requires `localize ~> 1.11`.
+
+### Fixed
+
+* A router helper for a route declared for some locales raised for a locale outside the list, and now gives it the default locale's route; `page_path(conn, :show, 1)` no longer reads `1` as params in such a locale.
 
 ## [1.5.0] — 2026-11-26
 

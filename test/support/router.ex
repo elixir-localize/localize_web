@@ -15,8 +15,8 @@ defmodule MyApp.Router do
     end
   end
 
-  # Interpolation
-  localize [:en, :fr, :de] do
+  # Interpolation, in every Gettext locale as `~q` requires
+  localize do
     get("/#{locale}/locale/pages/:page", PageController, :show, as: "with_locale")
     get("/#{language}/language/pages/:page", PageController, :show, as: "with_language")
     get("/#{territory}/territory/pages/:page", PageController, :show, as: "with_territory")

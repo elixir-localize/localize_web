@@ -12,6 +12,8 @@ Work planned for `localize_web`. Design documents, when a task needs one, live u
 
 ## Done
 
+* [x] **Links to a route declared for a subset of locales** — `:locales` on `path_for/3`, `url_for/3` and `hreflang_links/2`; router helpers dispatch per action over the locales its routes were declared for. 2026-11-28, unreleased (1.6.0).
+
 * [x] **Runtime locale routing** — `Localize.Routes.Prefix`, `Localize.Routes.locale_prefix/2`, `Localize.Plug.LocalePrefix`, `Localize.Live.LocalePrefix` and the runtime locale routing guide; design in [plans/runtime-locale-routing.md](plans/runtime-locale-routing.md). 2026-11-25.
 
 * [x] **A `content-language` response header** — `PutLocale` takes `content_language: true`, which names the canonical tag of the locale it set; off by default. 2026-11-25, unreleased (1.5.0).

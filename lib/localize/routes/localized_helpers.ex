@@ -56,40 +56,128 @@ defmodule Localize.Routes.LocalizedHelpers do
     Module.create(localized_helper_module, code, line: env.line, file: env.file)
   end
 
+  # The localized helpers: for each helper, one clause per action, which
+  # matches the action and dispatches over the locales that action has a
+  # route in, then a generic clause per arity for any other action, which
+  # keeps every locale so the helper it delegates to reports the action.
+  # Two routes may share a helper but not their locales, and a clause that
+  # took any action would read `page_path(conn, :show, 1)` as an action with
+  # params `1` in a locale that has no route of that shape. Sorted so the
+  # clauses of a name and arity stay together, the action clauses first.
   defp localized_helpers(groups, route_locales) do
-    # Escaped once and baked into every helper, which hands the tags to
-    # `Localize.Routes.route_locale/2` as they are.
+    helper_locales = helper_locales(groups, route_locales)
     escaped_locales = Macro.escape(route_locales)
-    seen = :sets.new()
 
-    {helpers, _} =
-      Enum.flat_map_reduce(groups, seen, fn {_helper, helper_routes}, seen ->
-        entries =
-          for {_, [{route, exprs} | _]} <- routes_in_order(helper_routes),
-              suffix <- @known_suffixes,
-              localized_route?(route) do
-            helper_fun_name = strip_locale(route.helper)
-            {_bins, vars} = :lists.unzip(exprs.binding)
-            {helper_fun_name, suffix, vars}
-          end
+    action_clauses =
+      groups
+      |> localized_action_entries()
+      |> Enum.flat_map(&action_clauses(&1, helper_locales))
 
-        {new_entries, seen} =
-          Enum.flat_map_reduce(entries, seen, fn {name, suffix, vars} = entry, seen ->
-            key = {name, suffix, length(vars)}
+    generic_clauses =
+      groups
+      |> localized_entries()
+      |> Enum.flat_map(&generic_clauses(&1, escaped_locales))
 
-            if :sets.is_element(key, seen) do
-              {[], seen}
-            else
-              {[entry], :sets.add_element(key, seen)}
-            end
-          end)
+    (action_clauses ++ generic_clauses)
+    |> Enum.sort_by(fn {function, arity, priority, _clause} -> {function, arity, priority} end)
+    |> Enum.map(fn {_function, _arity, _priority, clause} -> clause end)
+  end
 
-        {new_entries, seen}
-      end)
+  defp localized_action_entries(groups) do
+    entries =
+      for {_helper, helper_routes} <- groups,
+          {route, exprs} <- helper_routes,
+          localized_route?(route),
+          suffix <- @known_suffixes do
+        {_bins, vars} = :lists.unzip(exprs.binding)
+        {strip_locale(route.helper), suffix, route.plug_opts, vars}
+      end
 
-    Enum.map(helpers, fn {helper_fun_name, suffix, vars} ->
+    Enum.uniq_by(entries, fn {name, suffix, action, vars} ->
+      {name, suffix, action, length(vars)}
+    end)
+  end
+
+  defp localized_entries(groups) do
+    entries =
+      for {_helper, helper_routes} <- groups,
+          {_, [{route, exprs} | _]} <- routes_in_order(helper_routes),
+          suffix <- @known_suffixes,
+          localized_route?(route) do
+        {_bins, vars} = :lists.unzip(exprs.binding)
+        {strip_locale(route.helper), suffix, vars}
+      end
+
+    Enum.uniq_by(entries, fn {name, suffix, vars} -> {name, suffix, length(vars)} end)
+  end
+
+  # The tags of the action's routes are baked into its clauses and handed
+  # to `Localize.Routes.route_locale/2` as they are: a locale the action has
+  # no route in gets the default locale's route rather than no clause.
+  defp action_clauses({name, suffix, action, vars}, helper_locales) do
+    locales =
+      helper_locales
+      |> Map.fetch!({name, length(vars)})
+      |> Map.fetch!(action)
+
+    function = :"#{name}_#{suffix}"
+    arity = length(vars) + 2
+    escaped_action = Macro.escape(action)
+    escaped_locales = Macro.escape(locales)
+
+    without_params =
       quote generated: true do
-        def unquote(:"#{helper_fun_name}_#{suffix}")(
+        def unquote(function)(
+              conn_or_endpoint,
+              unquote(escaped_action),
+              unquote_splicing(vars)
+            ) do
+          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(escaped_locales))
+
+          helper(
+            unquote(name),
+            unquote(suffix),
+            locale,
+            conn_or_endpoint,
+            unquote(escaped_action),
+            unquote_splicing(vars),
+            %{}
+          )
+        end
+      end
+
+    with_params =
+      quote generated: true do
+        def unquote(function)(
+              conn_or_endpoint,
+              unquote(escaped_action),
+              unquote_splicing(vars),
+              params
+            ) do
+          locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(escaped_locales))
+
+          helper(
+            unquote(name),
+            unquote(suffix),
+            locale,
+            conn_or_endpoint,
+            unquote(escaped_action),
+            unquote_splicing(vars),
+            params
+          )
+        end
+      end
+
+    [{function, arity, 0, without_params}, {function, arity + 1, 1, with_params}]
+  end
+
+  defp generic_clauses({name, suffix, vars}, escaped_locales) do
+    function = :"#{name}_#{suffix}"
+    arity = length(vars) + 2
+
+    without_params =
+      quote generated: true do
+        def unquote(function)(
               conn_or_endpoint,
               plug_opts,
               unquote_splicing(vars)
@@ -97,7 +185,7 @@ defmodule Localize.Routes.LocalizedHelpers do
           locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(escaped_locales))
 
           helper(
-            unquote(helper_fun_name),
+            unquote(name),
             unquote(suffix),
             locale,
             conn_or_endpoint,
@@ -106,8 +194,11 @@ defmodule Localize.Routes.LocalizedHelpers do
             %{}
           )
         end
+      end
 
-        def unquote(:"#{helper_fun_name}_#{suffix}")(
+    with_params =
+      quote generated: true do
+        def unquote(function)(
               conn_or_endpoint,
               plug_opts,
               unquote_splicing(vars),
@@ -116,7 +207,7 @@ defmodule Localize.Routes.LocalizedHelpers do
           locale = Localize.Routes.route_locale(Localize.get_locale(), unquote(escaped_locales))
 
           helper(
-            unquote(helper_fun_name),
+            unquote(name),
             unquote(suffix),
             locale,
             conn_or_endpoint,
@@ -126,7 +217,8 @@ defmodule Localize.Routes.LocalizedHelpers do
           )
         end
       end
-    end)
+
+    [{function, arity, 2, without_params}, {function, arity + 1, 3, with_params}]
   end
 
   defp non_localized_helpers(groups, helper_module) do
@@ -164,6 +256,32 @@ defmodule Localize.Routes.LocalizedHelpers do
         end
       end
     end
+  end
+
+  # For each localized helper, keyed by its name and its number of path
+  # parameters, the Gettext locales each action has a route in, in the order
+  # of `route_locales`. A route inside `localize [:en, :fr]` is in those two
+  # locales only, and two routes may share a helper but not their locales:
+  # `get "/pages/:page"` in every locale and `resources "/comments"` in two
+  # are both `page_path/3`.
+  defp helper_locales(groups, route_locales) do
+    groups
+    |> Enum.flat_map(fn {_helper, helper_routes} -> helper_routes end)
+    |> Enum.filter(fn {route, _exprs} -> localized_route?(route) end)
+    |> Enum.group_by(&helper_key/1, fn {route, _exprs} -> route end)
+    |> Map.new(fn {key, routes} -> {key, action_locales(routes, route_locales)} end)
+  end
+
+  defp helper_key({route, exprs}) do
+    {strip_locale(route.helper), length(exprs.binding)}
+  end
+
+  defp action_locales(routes, route_locales) do
+    routes
+    |> Enum.group_by(& &1.plug_opts, & &1.private.localize_locale.cldr_locale_id)
+    |> Map.new(fn {action, locale_ids} ->
+      {action, Enum.filter(route_locales, &(&1.cldr_locale_id in locale_ids))}
+    end)
   end
 
   defp localized_route?(route) do

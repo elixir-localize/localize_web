@@ -134,6 +134,12 @@ localize "fr" do
 end
 ```
 
+A route declared for some locales has no address in the others. The router's helpers know which locales each route was declared for, and give any other locale the default locale's route, or the first listed locale's when the default is not listed. `~q` renders a route for every Gettext locale, so link to these routes with `path_for/3`, `url_for/3` or `hreflang_links/2` and the router's list as `:locales`:
+
+```elixir
+path_for(Localize.get_locale(), "/comments", locales: [:en, :fr])
+```
+
 ## Supported Route Macros
 
 The `localize` macro supports all standard Phoenix route macros:
@@ -271,7 +277,7 @@ Despite the syntax, `locale` is not a variable — it is a token the sigil recog
 
 ### Rendering a Path or URL in a Specific Locale
 
-`~q` dispatches on the *current* process locale (`Localize.get_locale/0`). When you need to render a link in a different locale at the call site — without changing the process locale — use `path_for/2` and `url_for/2`. Typical use cases are language switchers and emitting hreflang links per locale in one template pass.
+`~q` dispatches on the *current* process locale (`Localize.get_locale/0`). When you need to render a link in a different locale at the call site — without changing the process locale — use `path_for/3` and `url_for/3`. Typical use cases are language switchers and emitting hreflang links per locale in one template pass.
 
 ```elixir
 <.link navigate={path_for(:fr, "/users")}>Français</.link>
@@ -286,7 +292,7 @@ The locale argument can also be a runtime expression, which is the more common f
 <% end %>
 ```
 
-`url_for/2` returns a full URL via `Phoenix.VerifiedRoutes.url/1`:
+`url_for/3` returns a full URL via `Phoenix.VerifiedRoutes.url/1`:
 
 ```elixir
 url_for(:fr, "/users")
@@ -302,7 +308,7 @@ Localize.with_locale(:fr, fn -> ~q"/users" end)
 #=> "/users_fr"
 ```
 
-Use `path_for/2` for single-call locale forcing; use `Localize.with_locale/2` for whole-block temporary locale changes.
+Use `path_for/3` for single-call locale forcing; use `Localize.with_locale/2` for whole-block temporary locale changes.
 
 For hreflang annotations there is no need to iterate the locales yourself. `hreflang_links/2` renders a route once per locale configured in the Gettext backend and returns the `<link rel="alternate" hreflang="...">` set for the page `<head>`, validating each locale and URL as `Localize.HTML.Hreflang.links/2` does:
 

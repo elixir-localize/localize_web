@@ -16,13 +16,6 @@ defmodule Localize.LocalizedHelpersErrorsTest do
       end
     end
 
-    test "a locale without a clause for the helper names the locale" do
-      # The `chap` routes are localized for :fr only.
-      assert_raise ArgumentError, ~r/for locale/, fn ->
-        Helpers.chap_path(%Plug.Conn{}, :show, 1)
-      end
-    end
-
     test "params that are not a keyword list or map describe the expected call" do
       assert_raise ArgumentError, ~r/called with invalid params/, fn ->
         Helpers.page_path(%Plug.Conn{}, :show, 1, "page=5")
